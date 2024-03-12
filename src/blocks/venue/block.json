@@ -8,6 +8,7 @@
 	"icon": "location",
 	"example": {},
 	"description": "Provides information about an event venue.",
+	"usesContext": [ "postType", "postId"],
 	"attributes": {
 		"mapShow": {
 			"type": "boolean",

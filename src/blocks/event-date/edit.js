@@ -21,10 +21,12 @@ import {
 	defaultDateTimeStart,
 	getTimeZone,
 	getUtcOffset,
+	updateDateTimeEnd,
+	updateDateTimeStart,
 } from '../../helpers/datetime';
 import EditCover from '../../components/EditCover';
 import DateTimeRange from '../../components/DateTimeRange';
-import { getFromGlobal, isSinglePostInEditor } from '../../helpers/globals';
+import { getFromGlobal, isSinglePostInEditor, setToGlobal } from '../../helpers/globals';
 
 /**
  * Similar to get_display_datetime method in class-event.php.
@@ -81,9 +83,17 @@ const displayDateTime = (start, end, tz) => {
  * @see {@link displayDateTime} - Function for formatting and displaying date and time.
  * @see {@link Listener} - Function for adding event listeners.
  */
-const Edit = () => {
+const Edit = ({	context: { postType, postId } }) => {
+	// getFromGlobal('eventDetails.postId'),
+	// setToGlobal('eventDetails.postId', postId);
+	// updateDateTimeStart('2025-12-01T10:05:13')
+	// console.log(postId);
+	// console.log(window.GatherPress.eventDetails);
+	// updateDateTimeEnd()
+
 	const blockProps = useBlockProps();
 	const [dateTimeStart, setDateTimeStart] = useState(defaultDateTimeStart);
+	// const [dateTimeStart, setDateTimeStart] = useState('2025-12-01T10:05:13');
 	const [dateTimeEnd, setDateTimeEnd] = useState(defaultDateTimeEnd);
 	const [timezone, setTimezone] = useState(getTimeZone());
 

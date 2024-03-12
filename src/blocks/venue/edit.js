@@ -13,6 +13,14 @@ import {
 import { useSelect } from '@wordpress/data';
 import { useEffect, useState } from '@wordpress/element';
 
+
+import { useEntityProp } from '@wordpress/core-data';
+import { useEntityRecords } from '@wordpress/core-data';
+import { useEntityRecord } from '@wordpress/core-data';
+import { getEntityRecord } from '@wordpress/core-data';
+import { getEntityRecords } from '@wordpress/core-data';
+import { store as coreStore } from '@wordpress/core-data';
+
 /**
  * Internal dependencies.
  */
@@ -43,7 +51,7 @@ import { isSinglePostInEditor } from '../../helpers/globals';
  *
  * @return {JSX.Element} The rendered React component.
  */
-const Edit = ({ attributes, setAttributes, isSelected }) => {
+const Edit = ({ attributes, setAttributes, isSelected, context }) => {
 	const { mapZoomLevel, mapType, mapHeight } = attributes;
 	const [name, setName] = useState('');
 	const [fullAddress, setFullAddress] = useState('');
@@ -59,14 +67,198 @@ const Edit = ({ attributes, setAttributes, isSelected }) => {
 
 	let { mapShow } = attributes;
 
-	let venueInformationMetaData = useSelect(
+
+
+	// console.log(context.postId);
+	// console.log(context);
+	// if ( 'gp_event' === context.postType ) {
+
+		// const { event, hasResolvedEvents } = useEntityRecord( 'postType', context.postType, context.postId );
+		// console.log(event);
+		// console.log(event);
+		// console.log(event);
+		// console.log(event);
+/* 		
+		console.log(hasResolvedEvents);
+		console.log(hasResolvedEvents);
+		console.log(hasResolvedEvents);
+		// if ( hasResolvedEvents ) {
+			
+
+			const { shadowTax, hasResolvedTax } = useEntityRecord( 'taxonomy', '_gp_venue', event._gp_venue );
+
+			console.log(hasResolvedTax);
+			console.log(hasResolvedTax);
+			console.log(hasResolvedTax);
+			console.log(shadowTax);
+			// }
+			// }
+			
+			let eventPost = useSelect(
+				(select) =>
+				select('core/data')?.getEntityRecord( 'postType', context.postType, context.postId )
+				);	
+				
+				
+				console.log(eventPost);
+				*/
+/* 
+	const endpoint =
+		getFromGlobal('urls.eventRestApi') +
+		`/events-list?event_list_type=${type}&max_number=${maxNumberOfEvents}&datetime_format=${datetimeFormat}&topics=${topicsString}&venues=${venuesString}`;
+
+
+	apiFetch({
+		path: endpoint,
+	}).then((data) => {
+		setLoaded(true);
+		setEvents(data);
+	});
+ */
+
+
+
+// 
+// const [meta, setMeta] = useEntityProp('postType', postType, 'meta', postId);
+
+// const metaFieldValue = meta['venue_information'];
+// const updateMetaValue = (newValue) => {
+// 	setMeta({ ...meta, ['venue_information']: newValue });
+// };
+// console.log(meta);
+// console.log(metaFieldValue);
+
+
+
+
+
+
+const {
+	eventPost,
+} = useSelect(
+	( select ) => {
+		const { getEntityRecord } = select( coreStore );
+
+		return {
+			eventPost: getEntityRecord(
+				'postType',
+				context.postType,
+				context.postId
+			),
+		};
+	},
+	[
+		context,
+	]
+);
+
+
+const {
+	venueTaxonomy,
+} = useSelect(
+	( select ) => {
+		const { getEntityRecord } = select( coreStore );
+
+		return {
+			venueTaxonomy: getEntityRecord(
+				'taxonomy',
+				'_gp_venue',
+				eventPost._gp_venue
+			),
+		};
+	},
+	[
+		eventPost,
+	]
+);
+
+const {
+	venuePosts,
+} = useSelect(
+	( select ) => {
+		const { getEntityRecords } = select( coreStore );
+/* */
+		// If is 'online-event'
+		// if ( '_' !== venueTaxonomy.slug.substring(0, 1) ){
+		if ( typeof venueTaxonomy === 'undefined' ) {
+			return {
+				venuePosts: null
+			}
+		} 
+
+
+		return {
+			venuePosts: getEntityRecords(
+				'postType',
+				'gp_venue',
+				{slug: venueTaxonomy.slug.substring(1) }
+			),
+		};
+	},
+	[
+		venueTaxonomy,
+	]
+);
+
+const {
+	venueInformationMeta,
+} = useSelect(
+	( select ) => {
+		const { getEntityRecords } = select( coreStore );
+/* */
+		// If is 'online-event'
+		if ( null === venuePosts || typeof venuePosts[0] === 'undefined' ) {
+			return {
+				venueInformationMeta: false
+			}
+		} 
+
+
+		return {
+			venueInformationMeta: venuePosts[0].meta.venue_information,
+		};
+	},
+	[
+		venuePosts,
+	]
+);
+
+
+// console.log(eventPost);
+// console.log(venueTaxonomy);
+// // if ( undefined !== venueTaxonomy )
+// 	console.log(venuePosts);
+// 	console.log(venueInformationMeta);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	let venueInformationMetaData;
+
+
+/* 	let venueInformationMetaData = useSelect(
 		(select) =>
 			select('core/editor')?.getEditedPostAttribute('meta')
 				?.venue_information
-	);
+	); */
 
-	if (venueInformationMetaData) {
-		venueInformationMetaData = JSON.parse(venueInformationMetaData);
+	// if (venueInformationMetaData) {
+	if (venueInformationMeta) {
+		venueInformationMetaData = JSON.parse(venueInformationMeta);
 	} else {
 		venueInformationMetaData = {};
 	}
@@ -88,6 +280,7 @@ const Edit = ({ attributes, setAttributes, isSelected }) => {
 	});
 
 	useEffect(() => {
+		setFullAddress(venueInformationMetaData.fullAddress);
 		if (isVenuePostType()) {
 			setFullAddress(venueInformationMetaData.fullAddress);
 			setPhoneNumber(venueInformationMetaData.phoneNumber);
@@ -104,7 +297,7 @@ const Edit = ({ attributes, setAttributes, isSelected }) => {
 			if (!fullAddress && !phoneNumber && !website) {
 				setName(__('No venue selected.', 'gatherpress'));
 			} else {
-				setName('');
+				// setName('');
 			}
 		}
 	}, [
