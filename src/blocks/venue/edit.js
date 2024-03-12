@@ -12,13 +12,6 @@ import {
 } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { useEffect, useState } from '@wordpress/element';
-
-
-import { useEntityProp } from '@wordpress/core-data';
-import { useEntityRecords } from '@wordpress/core-data';
-import { useEntityRecord } from '@wordpress/core-data';
-import { getEntityRecord } from '@wordpress/core-data';
-import { getEntityRecords } from '@wordpress/core-data';
 import { store as coreStore } from '@wordpress/core-data';
 
 /**
@@ -59,49 +52,16 @@ const Edit = ({ attributes, setAttributes, isSelected, context }) => {
 	const [website, setWebsite] = useState('');
 	const [isOnlineEventTerm, setIsOnlineEventTerm] = useState(false);
 	const blockProps = useBlockProps();
-	const onlineEventLink = useSelect(
-		(select) =>
-			select('core/editor')?.getEditedPostAttribute('meta')
-				?.online_event_link
-	);
+	// const onlineEventLink = useSelect(
+	// 	(select) =>
+	// 		select('core/editor')?.getEditedPostAttribute('meta')
+	// 			?.online_event_link
+	// );
 
 	let { mapShow } = attributes;
 
-
-
-	// console.log(context.postId);
 	// console.log(context);
-	// if ( 'gp_event' === context.postType ) {
 
-		// const { event, hasResolvedEvents } = useEntityRecord( 'postType', context.postType, context.postId );
-		// console.log(event);
-		// console.log(event);
-		// console.log(event);
-		// console.log(event);
-/* 		
-		console.log(hasResolvedEvents);
-		console.log(hasResolvedEvents);
-		console.log(hasResolvedEvents);
-		// if ( hasResolvedEvents ) {
-			
-
-			const { shadowTax, hasResolvedTax } = useEntityRecord( 'taxonomy', '_gp_venue', event._gp_venue );
-
-			console.log(hasResolvedTax);
-			console.log(hasResolvedTax);
-			console.log(hasResolvedTax);
-			console.log(shadowTax);
-			// }
-			// }
-			
-			let eventPost = useSelect(
-				(select) =>
-				select('core/data')?.getEntityRecord( 'postType', context.postType, context.postId )
-				);	
-				
-				
-				console.log(eventPost);
-				*/
 /* 
 	const endpoint =
 		getFromGlobal('urls.eventRestApi') +
@@ -118,33 +78,55 @@ const Edit = ({ attributes, setAttributes, isSelected, context }) => {
 
 
 
-// 
-// const [meta, setMeta] = useEntityProp('postType', postType, 'meta', postId);
-
-// const metaFieldValue = meta['venue_information'];
-// const updateMetaValue = (newValue) => {
-// 	setMeta({ ...meta, ['venue_information']: newValue });
-// };
-// console.log(meta);
-// console.log(metaFieldValue);
-
-
-
-
-
-
 const {
 	eventPost,
+	venueTaxonomy,
+	venuePosts,
+	venueInformationMeta,
+	onlineEventLink,
 } = useSelect(
 	( select ) => {
-		const { getEntityRecord } = select( coreStore );
+		const { getEntityRecord }  = select( coreStore );
+		const { getEntityRecords } = select( coreStore );
+		
+		const eventPost = getEntityRecord(
+			'postType',
+			context.postType,
+			context.postId
+		);
+		const venueTaxonomy = getEntityRecord(
+			'taxonomy',
+			'_gp_venue',
+			eventPost?._gp_venue
+		);
 
-		return {
-			eventPost: getEntityRecord(
+		let venuePosts = null;
+		if ( typeof venueTaxonomy !== 'undefined' ) {
+			venuePosts = getEntityRecords(
 				'postType',
-				context.postType,
-				context.postId
-			),
+				'gp_venue',
+				{
+					slug: venueTaxonomy.slug.substring(1)
+				}
+			);
+		}
+// If is 'online-event'
+		let venueInformationMeta = false;
+		let onlineEventLink = false;
+		if ( null !== venuePosts && typeof venuePosts[0] !== 'undefined' ) {
+			venueInformationMeta = venuePosts[0].meta.venue_information;
+		} else {
+			setIsOnlineEventTerm();
+			onlineEventLink = eventPost?.meta?.online_event_link;
+
+		}
+		
+		return {
+			eventPost,
+			venueTaxonomy,
+			venuePosts,
+			venueInformationMeta,
+			onlineEventLink
 		};
 	},
 	[
@@ -153,94 +135,12 @@ const {
 );
 
 
-const {
-	venueTaxonomy,
-} = useSelect(
-	( select ) => {
-		const { getEntityRecord } = select( coreStore );
-
-		return {
-			venueTaxonomy: getEntityRecord(
-				'taxonomy',
-				'_gp_venue',
-				eventPost._gp_venue
-			),
-		};
-	},
-	[
-		eventPost,
-	]
-);
-
-const {
-	venuePosts,
-} = useSelect(
-	( select ) => {
-		const { getEntityRecords } = select( coreStore );
-/* */
-		// If is 'online-event'
-		// if ( '_' !== venueTaxonomy.slug.substring(0, 1) ){
-		if ( typeof venueTaxonomy === 'undefined' ) {
-			return {
-				venuePosts: null
-			}
-		} 
-
-
-		return {
-			venuePosts: getEntityRecords(
-				'postType',
-				'gp_venue',
-				{slug: venueTaxonomy.slug.substring(1) }
-			),
-		};
-	},
-	[
-		venueTaxonomy,
-	]
-);
-
-const {
-	venueInformationMeta,
-} = useSelect(
-	( select ) => {
-		const { getEntityRecords } = select( coreStore );
-/* */
-		// If is 'online-event'
-		if ( null === venuePosts || typeof venuePosts[0] === 'undefined' ) {
-			return {
-				venueInformationMeta: false
-			}
-		} 
-
-
-		return {
-			venueInformationMeta: venuePosts[0].meta.venue_information,
-		};
-	},
-	[
-		venuePosts,
-	]
-);
-
-
-// console.log(eventPost);
-// console.log(venueTaxonomy);
-// // if ( undefined !== venueTaxonomy )
-// 	console.log(venuePosts);
-// 	console.log(venueInformationMeta);
-
-
-
-
-
-
-
-
-
-
-
-
+console.log(eventPost);
+console.log(venueTaxonomy);
+// if ( undefined !== venueTaxonomy )
+	console.log(venuePosts);
+	console.log(venueInformationMeta);
+	console.log(onlineEventLink);
 
 
 
@@ -249,14 +149,6 @@ const {
 
 	let venueInformationMetaData;
 
-
-/* 	let venueInformationMetaData = useSelect(
-		(select) =>
-			select('core/editor')?.getEditedPostAttribute('meta')
-				?.venue_information
-	); */
-
-	// if (venueInformationMetaData) {
 	if (venueInformationMeta) {
 		venueInformationMetaData = JSON.parse(venueInformationMeta);
 	} else {
@@ -280,7 +172,7 @@ const {
 	});
 
 	useEffect(() => {
-		setFullAddress(venueInformationMetaData.fullAddress);
+		setFullAddress(venueInformationMetaData.fullAddress); // TODO
 		if (isVenuePostType()) {
 			setFullAddress(venueInformationMetaData.fullAddress);
 			setPhoneNumber(venueInformationMetaData.phoneNumber);
@@ -318,7 +210,7 @@ const {
 						initialOpen={true}
 					>
 						<PanelRow>
-							{!isVenuePostType() && <VenueSelector />}
+							{/* {!isVenuePostType() && <VenueSelector />} */}
 							{isVenuePostType() && <VenueInformation />}
 						</PanelRow>
 						{isOnlineEventTerm && (
