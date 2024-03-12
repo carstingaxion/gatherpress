@@ -204,13 +204,14 @@ console.log(venueTaxonomy);
 	return (
 		<>
 			<InspectorControls>
-				{isSinglePostInEditor() && (
+				{isSinglePostInEditor() && ( isEventPostType() || isVenuePostType() ) && (
 					<PanelBody
 						title={__('Venue settings', 'gatherpress')}
 						initialOpen={true}
 					>
 						<PanelRow>
 							{/* {!isVenuePostType() && <VenueSelector />} */}
+							{isEventPostType() && <VenueSelector />}
 							{isVenuePostType() && <VenueInformation />}
 						</PanelRow>
 						{isOnlineEventTerm && (
