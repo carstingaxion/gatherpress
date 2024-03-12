@@ -8,6 +8,10 @@
   "icon": "clock",
   "example": {},
   "description": "Displays the date and time for an event.",
+  "usesContext": [
+    "postType",
+    "postId"
+  ],
   "attributes": {
     "eventEnd": {
       "type": "string"
