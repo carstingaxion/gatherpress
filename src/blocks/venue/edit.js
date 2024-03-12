@@ -242,44 +242,48 @@ console.log(venueTaxonomy);
 								}}
 							/>
 						</PanelRow>
-						<RangeControl
-							label={__('Zoom level', 'gatherpress')}
-							beforeIcon="search"
-							value={mapZoomLevel}
-							onChange={(value) =>
-								setAttributes({ mapZoomLevel: value })
-							}
-							min={1}
-							max={22}
-						/>
-						<RadioControl
-							label={__('Map type', 'gatherpress')}
-							selected={mapType}
-							options={[
-								{
-									label: __('Roadmap', 'gatherpress'),
-									value: 'm',
-								},
-								{
-									label: __('Satellite', 'gatherpress'),
-									value: 'k',
-								},
-							]}
-							onChange={(value) => {
-								setAttributes({ mapType: value });
-							}}
-						/>
-						<RangeControl
-							label={__('Map height', 'gatherpress')}
-							beforeIcon="location"
-							value={mapHeight}
-							onChange={(height) =>
-								setAttributes({ mapHeight: height })
-							}
-							min={100}
-							max={1000}
-						/>
-					</PanelBody>
+						{mapShow && (
+							<>
+								<RangeControl
+									label={__('Zoom level', 'gatherpress')}
+									beforeIcon="search"
+									value={mapZoomLevel}
+									onChange={(value) =>
+										setAttributes({ mapZoomLevel: value })
+									}
+									min={1}
+									max={22}
+								/>
+								<RadioControl
+									label={__('Map type', 'gatherpress')}
+									selected={mapType}
+									options={[
+										{
+											label: __('Roadmap', 'gatherpress'),
+											value: 'm',
+										},
+										{
+											label: __('Satellite', 'gatherpress'),
+											value: 'k',
+										},
+									]}
+									onChange={(value) => {
+										setAttributes({ mapType: value });
+									}}
+								/>
+								<RangeControl
+									label={__('Map height', 'gatherpress')}
+									beforeIcon="location"
+									value={mapHeight}
+									onChange={(height) =>
+										setAttributes({ mapHeight: height })
+									}
+									min={100}
+									max={1000}
+								/>
+							</>							
+						)}
+						</PanelBody>
 				)}
 			</InspectorControls>
 
