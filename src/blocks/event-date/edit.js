@@ -21,8 +21,8 @@ import {
 	defaultDateTimeStart,
 	getTimeZone,
 	getUtcOffset,
-	updateDateTimeEnd,
-	updateDateTimeStart,
+	// updateDateTimeEnd,
+	// updateDateTimeStart,
 } from '../../helpers/datetime';
 import EditCover from '../../components/EditCover';
 import DateTimeRange from '../../components/DateTimeRange';

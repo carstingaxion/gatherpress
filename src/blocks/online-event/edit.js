@@ -27,7 +27,11 @@ import { isSinglePostInEditor } from '../../helpers/globals';
  *
  * @return {JSX.Element} The rendered React component.
  */
-const Edit = ({ isSelected }) => {
+const Edit = ({ attributes, isSelected, context } ) => {
+
+	// console.log( attributes );
+	// console.log( context );
+
 	const blockProps = useBlockProps();
 	const onlineEventLink = useSelect(
 		(select) =>
@@ -48,6 +52,7 @@ const Edit = ({ isSelected }) => {
 			)}
 			<div {...blockProps}>
 				<EditCover isSelected={isSelected}>
+				{/* <EditCover> */}
 					<OnlineEvent onlineEventLinkDefault={onlineEventLink} />
 				</EditCover>
 			</div>

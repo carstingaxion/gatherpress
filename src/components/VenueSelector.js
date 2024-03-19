@@ -57,7 +57,7 @@ const VenueSelector = () => {
 
 	useEffect(() => {
 		let venueInformation = {};
-
+console.log(venuePost);
 		if (venueSlug && Array.isArray(venuePost)) {
 			const jsonString = venuePost[0]?.meta?.venue_information ?? '{}';
 
@@ -68,7 +68,8 @@ const VenueSelector = () => {
 		}
 
 		const nameUpdated =
-			venueInformation?.name ?? __('No venue selected.', 'gatherpress');
+			// venueInformation?.name ?? __('No venue selected.', 'gatherpress');
+			venueInformation?.name ?? __('No DEBUG_VenueSelector venue selected.', 'gatherpress');
 		const fullAddressUpdated = venueInformation?.fullAddress ?? '';
 		const phoneNumberUpdated = venueInformation?.phoneNumber ?? '';
 		const websiteUpdated = venueInformation?.website ?? '';

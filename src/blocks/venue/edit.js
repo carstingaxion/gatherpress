@@ -116,7 +116,7 @@ const {
 		if ( null !== venuePosts && typeof venuePosts[0] !== 'undefined' ) {
 			venueInformationMeta = venuePosts[0].meta.venue_information;
 		} else {
-			setIsOnlineEventTerm();
+			// setIsOnlineEventTerm(true);
 			onlineEventLink = eventPost?.meta?.online_event_link;
 
 		}
@@ -134,7 +134,7 @@ const {
 	]
 );
 
-
+/* 
 console.log(eventPost);
 console.log(venueTaxonomy);
 // if ( undefined !== venueTaxonomy )
@@ -142,7 +142,7 @@ console.log(venueTaxonomy);
 	console.log(venueInformationMeta);
 	console.log(onlineEventLink);
 
-
+ */
 
 
 
@@ -172,7 +172,11 @@ console.log(venueTaxonomy);
 	});
 
 	useEffect(() => {
+		
 		setFullAddress(venueInformationMetaData.fullAddress); // TODO
+		setPhoneNumber(venueInformationMetaData.phoneNumber);
+		setWebsite(venueInformationMetaData.website);
+
 		if (isVenuePostType()) {
 			setFullAddress(venueInformationMetaData.fullAddress);
 			setPhoneNumber(venueInformationMetaData.phoneNumber);
@@ -187,9 +191,10 @@ console.log(venueTaxonomy);
 
 		if (isEventPostType() || !isSinglePostInEditor()) {
 			if (!fullAddress && !phoneNumber && !website) {
-				setName(__('No venue selected.', 'gatherpress'));
+				// setName(__('No venue selected.', 'gatherpress'));
+				setName(__('No DEBUG venue selected.', 'gatherpress'));
 			} else {
-				// setName('');
+				setName('');
 			}
 		}
 	}, [
@@ -214,6 +219,7 @@ console.log(venueTaxonomy);
 							{isEventPostType() && <VenueSelector />}
 							{isVenuePostType() && <VenueInformation />}
 						</PanelRow>
+						{/* {onlineEventLink && ( */}
 						{isOnlineEventTerm && (
 							<PanelRow>
 								<OnlineEventLink />
@@ -221,6 +227,7 @@ console.log(venueTaxonomy);
 						)}
 					</PanelBody>
 				)}
+				{/* {!onlineEventLink && ( */}
 				{!isOnlineEventTerm && (
 					<PanelBody
 						title={__('Map settings', 'gatherpress')}
@@ -288,7 +295,8 @@ console.log(venueTaxonomy);
 			</InspectorControls>
 
 			<div {...blockProps}>
-				<EditCover isSelected={isSelected}>
+				{/* <EditCover isSelected={isSelected}> */}
+				<EditCover>
 					<div className="gp-venue">
 						<VenueOrOnlineEvent
 							name={name}
@@ -296,6 +304,7 @@ console.log(venueTaxonomy);
 							phoneNumber={phoneNumber}
 							website={website}
 							isOnlineEventTerm={isOnlineEventTerm}
+							// isOnlineEventTerm={false !== onlineEventLink}
 							onlineEventLink={onlineEventLink}
 						/>
 						{mapShow && (

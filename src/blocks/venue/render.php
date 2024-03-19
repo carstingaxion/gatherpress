@@ -16,7 +16,7 @@ $gatherpress_venue      = Venue::get_instance();
 $gatherpress_attributes = array_merge(
 	$attributes,
 	$gatherpress_venue->get_venue_meta( get_the_ID(), get_post_type() )
-);
+); 
 
 // Don't render name on venue post.
 if ( Venue::POST_TYPE === get_post_type() ) {

@@ -698,7 +698,7 @@ class Rest_Api {
 		// - The event is in the future.
 		// - The code is not in an admin context.
 		$response->data['meta']['online_event_link'] = $event->maybe_get_online_event_link();
-
+  
 		return $response;
 	}
 }
