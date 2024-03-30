@@ -57,7 +57,7 @@ const VenueSelector = () => {
 
 	useEffect(() => {
 		let venueInformation = {};
-console.log(venuePost);
+// console.log(venuePost);
 		if (venueSlug && Array.isArray(venuePost)) {
 			const jsonString = venuePost[0]?.meta?.venue_information ?? '{}';
 
