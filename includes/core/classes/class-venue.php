@@ -129,7 +129,7 @@ class Venue {
 				),
 				'menu_icon'    => 'dashicons-location',
 				'template'     => array(
-					array( 'gatherpress/venue' ),
+					array( 'core/pattern', array( 'slug' => 'gatherpress/venue-details' ) ),
 				),
 				'rewrite'      => array(
 					'slug' => _x( 'venue', 'Post Type Slug', 'gatherpress' ),
@@ -199,6 +199,9 @@ class Venue {
 				'show_in_rest'      => true,
 			)
 		);
+		// THIS IS IMPORTANT
+		// It is neccessary to make this tax visible on event posts within REST responses.
+		register_taxonomy_for_object_type( self::TAXONOMY, Event::POST_TYPE );
 	}
 
 	/**
