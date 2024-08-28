@@ -74,6 +74,132 @@ class Event_Setup {
 		add_filter( 'get_the_date', array( $this, 'get_the_event_date' ) );
 		add_filter( 'the_time', array( $this, 'get_the_event_date' ) );
 		add_filter( 'display_post_states', array( $this, 'set_event_archive_labels' ), 10, 2 );
+
+// https://wordpress.stackexchange.com/a/12969/20992
+add_filter( 'query_vars', function ( $query_vars ) {
+	$query_vars[] = 'random';
+	return $query_vars;
+});
+
+// https://wordpress.stackexchange.com/a/301193/20992
+/**
+ * Fires after WordPress has finished loading but before any headers are sent.
+ *
+ */
+add_action('init', function() : void {
+
+	/**
+	 * Adds a new rewrite tag %random%.
+	 *
+	 * This function must be called on 'init' or earlier.
+	 * 
+	 * @see https://developer.wordpress.org/reference/functions/add_rewrite_tag/#more-information
+	 */
+	add_rewrite_tag( '%random%', '(\d+)', 'random=' );
+} );
+
+// Filters the list (OF THE CLICKABLE) of available permalink structure tags on the Permalinks settings page.
+// add_filter( 'available_permalink_structure_tags', function ( array $tags ) : array {
+//     $tags['random'] = 'some random thing';
+//     return $tags;
+// });
+
+// or 'post_link' , or any other link filter 
+// note, you can have more arguments passed to callback, 
+// but this depends on link.
+add_filter( 'post_link', function( string $permalink ) : string {
+    if (false === strpos( $permalink, '%random%' ) ) {
+        return $permalink;
+    }
+    return str_replace( '%random%', rand(1000, 4000), $permalink);
+});
+
+
+
+
+
+
+
+// // https://wordpress.stackexchange.com/a/12969/20992
+// add_filter( 'query_vars', function ( $query_vars ) {
+// 	$query_vars[] = 'event_day';
+// 	return $query_vars;
+// });
+
+// https://wordpress.stackexchange.com/a/301193/20992
+/**
+ * Fires after WordPress has finished loading but before any headers are sent.
+ *
+ */
+add_action('init', function() : void {
+
+	/**
+	 * Adds a new rewrite tag %random%.
+	 *
+	 * This function must be called on 'init' or earlier.
+	 * 
+	 * @see https://developer.wordpress.org/reference/functions/add_rewrite_tag/#more-information
+	 */
+	// add_rewrite_tag( '%event_day%', '(\d+)', 'event_day=' );
+	
+	
+	
+	add_permastruct('veranstaltungen', 'ivent/%postname%--%event_day%', false, EP_PERMALINK );
+	
+    // add_rewrite_tag('%event_day%', '(\d+)', 'event_day=');
+	add_rewrite_tag( '%event_day%', '(\d+)', 'post_type=gatherpress_event&event_day=' );
+    // add_rewrite_rule('^veranstaltungen/([^/]*)--([^/]*)/?','index.php?post_type=gatherpress_event&name=$matches[1]&event_day=$matches[2]','top');
+	
+} );
+
+// Filters the list (OF THE CLICKABLE) of available permalink structure tags on the Permalinks settings page.
+add_filter( 'available_permalink_structure_tags', function ( array $tags ) : array {
+    $tags['event_day'] = 'the event start day';
+    return $tags;
+});
+
+/**
+ * Filters the permalink for a post of a custom post type.
+ */
+add_filter( 'post_type_link', function( string $permalink, WP_Post $post, bool $leavename, bool $sample ) : string {
+    if ( 'gatherpress_event' !== $post->post_type ) {
+		return $permalink;
+	}
+	
+	if (false === strpos( $permalink, '%event_day%' ) ) {
+        return $permalink;
+    }
+
+	$event = new Event( $post->ID );
+
+	// Define the placeholders and their replacements
+	$placeholders = array(
+		'%postname%'  => $post->post_name,
+		'%event_day%' => $event->get_datetime_start( 'm' ), // Default is 'D, M j, Y, g:i a T'.
+	);
+
+	// Replace the placeholders in the permalink structure
+	return str_replace(
+		array_keys( $placeholders ),
+		array_values( $placeholders ),
+		$permalink
+	);
+ 
+
+    // return str_replace(
+	// 	'%event_day%',
+	// 	$event->get_datetime_start( 'm' ), // Default is 'D, M j, Y, g:i a T'.
+	// 	$permalink
+	// );
+}, 00, 4 );
+
+
+
+
+
+
+
+
 	}
 
 	/**
@@ -141,7 +267,9 @@ class Event_Setup {
 				'menu_icon'     => 'dashicons-nametag',
 				'has_archive'   => true,
 				'rewrite'       => array(
-					'slug'       => $rewrite_slug,
+					// 'slug'       => $rewrite_slug,
+					// 'slug'       => 'ivent/%postname%--%event_day%',
+					'slug'       => 'ivent',
 					'with_front' => false,
 				),
 			)
