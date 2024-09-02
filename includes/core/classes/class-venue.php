@@ -190,7 +190,10 @@ class Venue {
 			self::TAXONOMY,
 			Event::POST_TYPE,
 			array(
-				'labels'             => array(),
+				'labels'             => array(
+					'name'          => _x( 'Venues', 'Taxonomy General Name', 'gatherpress' ),
+					'singular_name' => _x( 'Venue', 'Taxonomy Singular Name', 'gatherpress' ),
+				),
 				'hierarchical'       => false,
 				'public'             => true,
 				'show_ui'            => false,
@@ -261,8 +264,15 @@ class Venue {
 			return;
 		}
 
-		// Only proceed if the venue post is being published.
-		if ( 'publish' !== $post_after->post_status ) {
+		// Only proceed if the venue post is being published or trashed.
+		if ( ! in_array(
+			$post_after->post_status,
+			array(
+				'publish',
+				'trash',
+			),
+			true
+		) ) {
 			return;
 		}
 
