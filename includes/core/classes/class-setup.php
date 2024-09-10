@@ -111,6 +111,131 @@ class Setup {
 			),
 			array( $this, 'filter_plugin_action_links' )
 		);
+
+		add_filter( 'embed_template', function ( $template ) {
+			if ( 'gatherpress_event' === get_post_type() ) {
+			//   return $this->oembed_template_include('event-template.php' );
+
+				add_action( 'embed_head', array( $this, 'wp_print_styles' ), 20 );
+				
+				add_action( 'embed_content', array( $this, 'embed_author' ) );
+
+				add_action( 'embed_content_meta', array( $this, 'print_embed_comments_button' ) );
+
+			}
+		
+			return $template;
+		} );
+
+	}
+
+public function wp_print_styles() : void {
+	wp_enqueue_style( 'global-styles' );
+}
+
+
+/**
+ * Add the author div to the embed iframe.
+ */
+public function embed_author() {
+	$output  = '';
+
+	$output .= do_blocks('<!-- wp:separator -->
+	<hr class="wp-block-separator has-alpha-channel-opacity"/>
+	<!-- /wp:separator -->
+	
+	<!-- wp:gatherpress/event-date /-->
+	
+	<!-- wp:gatherpress/venue {"mapShow":false} /-->
+	
+	<!-- wp:gatherpress/rsvp-response /-->
+	
+	<!-- wp:separator -->
+<hr class="wp-block-separator has-alpha-channel-opacity"/>
+<!-- /wp:separator -->');
+
+	echo $output;
+}
+
+/**
+ * Prints the necessary markup for the embed comments button.
+ *
+ * @since 4.4.0
+ */
+function print_embed_comments_button() {
+	if ( is_404() || ! ( get_comments_number() || comments_open() ) ) {
+		return;
+	}
+	?>
+	<div class="wp-embed-comments">
+		<a href="<?php comments_link(); ?>" target="_top">
+			<span class="dashicons dashicons-calendar"></span>
+			<?php
+			printf(
+				/* translators: %s: Number of comments. */
+				_n(
+					'%s <span class="screen-reader-text">Comment</span>',
+					'%s <span class="screen-reader-text">Comments</span>',
+					get_comments_number()
+				),
+				number_format_i18n( get_comments_number() )
+			);
+			?>
+		</a>
+	</div>
+	<?php
+}
+
+	/**
+	 * Filters the path of the current template before including it.
+	 *
+	 * This method checks if the theme or child theme provides a custom template for the
+	 * current endpoint. If a theme template exists, it will use that; otherwise, it will
+	 * fall back to the default template provided by the plugin. The template information
+	 * is provided by the callback set during the construction of the endpoint.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $file_name The file_name of the template to include.
+	 * @param string $file_name (Optional) The absolute path of the template to include.
+	 * @return string           The path of the template to include, either from the theme or plugin.
+	 */
+	public function oembed_template_include( string $file_name, string $path = null ): string {
+
+		/**
+		 * Check if the theme has the same template included
+		 * If that's the case, we don't want to load the template from the plugin,
+		 * because templates should be overwritable by a theme or child theme.
+		 *
+		 * @see https://developer.wordpress.org/reference/functions/locate_template/
+		 */
+		$theme_tmpl = locate_template( $file_name );
+		if ( $theme_tmpl ) {
+			return $theme_tmpl;
+		}
+
+		// Prepare the path to the template directory from the given args
+		// or fallback to the default in the plugin folder.
+		$dir_path = ( ! empty( $path ) )
+			? $path
+			: sprintf(
+				'%s/includes/templates/oembed',
+				GATHERPRESS_CORE_PATH
+			);
+
+		// Combine the directory path and file name to get the full path to the template.
+		$file_path = sprintf(
+			'%s/%s',
+			$dir_path,
+			$file_name
+		);
+
+		// If no file exist, do not include and rerturn the default.
+		if ( ! file_exists( $file_path ) ) {
+			return $template;
+		}
+		// Return the plugin's template if no theme override exists.
+		return $file_path;
 	}
 
 	/**
