@@ -7,6 +7,7 @@
  * Author URI:        https://gatherpress.org/
  * Version:           0.31.0-alpha
  * Requires PHP:      7.4
+ * Requires Plugins:  gutenberg
  * Requires at least: 6.4
  * Text Domain:       gatherpress
  * Domain Path:       /languages

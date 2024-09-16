@@ -54,6 +54,7 @@ class Event_Setup {
 	protected function setup_hooks(): void {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'init', array( $this, 'register_post_meta' ) );
+		add_action( 'init', array( $this, 'register_block_template' ) );
 		add_action( 'delete_post', array( $this, 'delete_event' ) );
 		add_action( 'wp_after_insert_post', array( $this, 'set_datetimes' ) );
 		add_action( sprintf( 'save_post_%s', Event::POST_TYPE ), array( $this, 'check_waiting_list' ) );
@@ -114,6 +115,9 @@ class Event_Setup {
 				'public'        => true,
 				'hierarchical'  => false,
 				'template'      => array(
+					array( 'core/pattern', array( 'slug' => 'gatherpress/something-unique-nobody-would-ever-call-a-template' ) ),
+				),
+/* 				'template'      => array(
 					array( 'gatherpress/event-date' ),
 					array( 'gatherpress/add-to-calendar' ),
 					array( 'gatherpress/venue' ),
@@ -128,7 +132,7 @@ class Event_Setup {
 						),
 					),
 					array( 'gatherpress/rsvp-response' ),
-				),
+				), */
 				'menu_position' => 4,
 				'supports'      => array(
 					'title',
@@ -292,6 +296,29 @@ class Event_Setup {
 				$args
 			);
 		}
+	}
+
+
+	public function register_block_template(): void {
+		// the namespace is not allowed to contain "_" as it is validated against: '/^[a-z0-9-]+\/\/[a-z0-9-]+$/'
+		// @see /wp-content/plugins/gutenberg/lib/compat/wordpress-6.7/class-wp-block-templates-registry.php lines 53ff
+		// maybe open an issue about that missmatching error message
+		\wp_register_block_template( 'gatherpress//something-unique-nobody-would-ever-call-a-template', [
+			'title'       => __( 'Event innerBlocks', 'gatherpress' ),
+			'description' => __( 'The blocks that get pre-populated for a new event.', 'gatherpress' ),
+			'content'     => self::get_template_content( 'editor/default-event-blocks.php' ),
+		] );
+	}
+
+	public static function get_template_content( $template ) {
+		ob_start();
+		// include __DIR__ . "/templates/{$template}";
+		include sprintf(
+			'%s/includes/templates/%s',
+			GATHERPRESS_CORE_PATH,
+			$template
+		);
+		return ob_get_clean();
 	}
 
 	/**
