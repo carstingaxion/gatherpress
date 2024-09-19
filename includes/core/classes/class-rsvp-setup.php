@@ -14,6 +14,8 @@ namespace GatherPress\Core;
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
 
+use GatherPress\Core\Endpoints\Endpoint_Template;
+use GatherPress\Core\Endpoints\Posttype_Single_Endpoint;
 use GatherPress\Core\Traits\Singleton;
 
 /**
@@ -52,7 +54,16 @@ class Rsvp_Setup {
 	 */
 	protected function setup_hooks(): void {
 		add_action( 'init', array( $this, 'register_taxonomy' ) );
+		add_action( 'init', array( $this, 'register_block_template' ) );
 		add_filter( 'get_comments_number', array( $this, 'adjust_comments_number' ), 10, 2 );
+		add_action(
+			sprintf(
+				'registered_post_type_%s',
+				'gatherpress_event'
+			),
+			array( $this, 'setup_endpoint' ),
+		);
+		add_filter( 'show_admin_bar', '__return_false' ); // @todo DEBUG DEMO ONLY !!!
 	}
 
 	/**
@@ -99,5 +110,60 @@ class Rsvp_Setup {
 		$comment_count = get_comment_count( $post_id );
 
 		return $comment_count['approved'] ?? 0;
+	}
+
+	public function register_block_template(): void {
+		// the namespace is not allowed to contain "_" as it is validated against: '/^[a-z0-9-]+\/\/[a-z0-9-]+$/'
+		// @see /wp-content/plugins/gutenberg/lib/compat/wordpress-6.7/class-wp-block-templates-registry.php lines 53ff
+		// maybe open an issue about that missmatching error message
+		\wp_register_block_template( 'gatherpress//rsvp', [
+			'title'       => __( 'RSVP', 'gatherpress' ),
+			'description' => __( 'A RSVP block template .', 'gatherpress' ),
+			'content'     => self::get_template_content( 'endpoints/rsvp.php' ),
+		] );
+	}
+
+	public static function get_template_content( $template ) {
+		ob_start();
+		// include __DIR__ . "/templates/{$template}";
+		include sprintf(
+			'%s/includes/templates/%s',
+			GATHERPRESS_CORE_PATH,
+			$template
+		);
+		return ob_get_clean();
+	}
+
+	public function setup_endpoint(): void {
+
+		new Posttype_Single_Endpoint(
+			array(
+				new Endpoint_Template( 'rsvp', array( $this, 'get_rsvp_template' ) ),
+			),
+			'rsvp'
+		);
+	}
+
+
+	/**
+	 * Returns the template for the RSVP.
+	 *
+	 * This method provides the template file to be used for ....
+	 *
+	 * By adding a file with the same name to your themes root folder
+	 * or your themes `/templates` folder, this template will be used
+	 * with priority over the default template provided by GatherPress.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return array An array containing:
+	 *               - 'file_name': the file name of the template to be loaded from the theme. Will load defaults from the plugin if theme files do not exist.
+	 *               - 'dir_path':  (Optional) Absolute path to some template directory outside of the theme folder.
+	 */
+	public function get_rsvp_template(): array {
+		return array(
+			// 'file_name' => Utility::prefix_key( 'rsvp.php' ),
+			'file_name' => 'rsvp.php',
+		);
 	}
 }
