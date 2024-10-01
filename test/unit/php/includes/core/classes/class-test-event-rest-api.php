@@ -173,6 +173,9 @@ class Test_Event_Rest_Api extends Base {
 	public function test_send_email(): void {
 		add_filter( 'pre_wp_mail', '__return_false' );
 
+// $this->mock->mail( [
+// 	'send' => false,
+// ] );
 		$instance = Event_Rest_Api::get_instance();
 		$event_id = $this->mock->post(
 			array( 'post_type' => Event::POST_TYPE )
@@ -200,6 +203,10 @@ class Test_Event_Rest_Api extends Base {
 			$instance->send_emails( $event_id, $send, $message ),
 			'Failed to assert true for sending email.'
 		);
+// $this->mock->mail( [
+// 	'send' => true,
+// ] );
+
 	}
 
 	/**
