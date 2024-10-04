@@ -105,7 +105,7 @@ class Assets {
 	 */
 	public function add_global_object(): void {
 		?>
-		<script>window.GatherPress = <?php echo wp_json_encode( $this->localize( get_the_ID() ?? 0 ) ); ?></script>
+		<script>window.GatherPress = <?php echo wp_json_encode( $this->localize( intval( get_the_ID() ) ) ); ?></script>
 		<?php
 	}
 
@@ -310,15 +310,18 @@ class Assets {
 				'dateFormat'           => $settings->get_value( 'general', 'formatting', 'date_format' ),
 				'enableAnonymousRsvp'  => ( 1 === (int) $settings->get_value( 'general', 'general', 'enable_anonymous_rsvp' ) ),
 				'enableInitialDecline' => ( 1 === (int) $settings->get_value( 'general', 'general', 'enable_initial_decline' ) ),
+				'mapPlatform'          => $settings->get_value( 'general', 'general', 'map_platform' ),
 				'maxAttendanceLimit'   => $settings->get_value( 'general', 'general', 'max_attendance_limit' ),
 				'maxGuestLimit'        => $settings->get_value( 'general', 'general', 'max_guest_limit' ),
 				'showTimezone'         => ( 1 === (int) $settings->get_value( 'general', 'formatting', 'show_timezone' ) ),
 				'timeFormat'           => $settings->get_value( 'general', 'formatting', 'time_format' ),
 			),
 			'urls'         => array(
+				'pluginUrl'       => GATHERPRESS_CORE_URL,
 				'eventRestApi'    => $event_rest_api,
 				'loginUrl'        => $this->get_login_url( $post_id ),
 				'registrationUrl' => $this->get_registration_url( $post_id ),
+				'homeUrl'         => get_home_url(),
 			),
 		);
 	}
@@ -382,7 +385,6 @@ class Assets {
 
 		switch ( get_post_type() ) {
 			case Event::POST_TYPE:
-				$blocks;
 				break;
 			case Venue::POST_TYPE:
 				$blocks = array(

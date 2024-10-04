@@ -97,7 +97,6 @@ class Test_Event extends Base {
 	 * @return void
 	 */
 	public function test_get_display_datetime( array $params, string $expects ): void {
-
 		update_option( 'date_format', 'l, F j, Y' );
 		update_option( 'time_format', 'g:i A' );
 
@@ -114,6 +113,23 @@ class Test_Event extends Base {
 			$output = $event->save_datetimes( $params );
 
 			$this->assertTrue( $output, 'Failed to assert that datetimes saved.' );
+			$this->assertSame(
+				$params['datetime_start'],
+				get_post_meta( $post->ID, 'gatherpress_datetime_start', true ),
+				'Failed to assert that datetime start matches parameter.'
+			);
+			$this->assertSame(
+				$params['datetime_end'],
+				get_post_meta( $post->ID, 'gatherpress_datetime_end', true ),
+				'Failed to assert that datetime end matches parameter.'
+			);
+			if ( ! empty( $params['timezone'] ) ) {
+				$this->assertSame(
+					$params['timezone'],
+					get_post_meta( $post->ID, 'gatherpress_timezone', true ),
+					'Failed to assert that timezone matches parameter.'
+				);
+			}
 		}
 
 		$this->assertSame(
@@ -406,11 +422,15 @@ class Test_Event extends Base {
 
 		$event->save_datetimes( $params );
 
-		$output  = $event->get_calendar_links();
+		$output = $event->get_calendar_links();
+
+		$expected_google_link = 'https://www.google.com/calendar/event?action=TEMPLATE&text=Unit%20Test%20Event&dates=20200511T150000Z%2F20200511T170000Z&details=' . rawurlencode( $description ) . '&location=Unit%20Test%20Venue%2C%20123%20Main%20Street%2C%20Montclair%2C%20NJ%2007042&sprop=name%3A';
+		$expected_yahoo_link  = 'https://calendar.yahoo.com/?v=60&view=d&type=20&title=Unit%20Test%20Event&st=20200511T150000Z&dur=0200&desc=' . rawurlencode( $description ) . '&in_loc=Unit%20Test%20Venue%2C%20123%20Main%20Street%2C%20Montclair%2C%20NJ%2007042';
+
 		$expects = array(
 			'google'  => array(
 				'name' => 'Google Calendar',
-				'link' => 'https://www.google.com/calendar/event?action=TEMPLATE&text=Unit Test Event&dates=20200511T150000Z/20200511T170000Z&details=' . $description . '&location=Unit Test Venue, 123 Main Street, Montclair, NJ 07042&sprop=name:',
+				'link' => $expected_google_link,
 			),
 			'ical'    => array(
 				'name'     => 'iCal',
@@ -422,7 +442,7 @@ class Test_Event extends Base {
 			),
 			'yahoo'   => array(
 				'name' => 'Yahoo Calendar',
-				'link' => 'https://calendar.yahoo.com/?v=60&view=d&type=20&title=Unit Test Event&st=20200511T150000Z&dur=0200&desc=' . $description . '&in_loc=Unit Test Venue, 123 Main Street, Montclair, NJ 07042',
+				'link' => $expected_yahoo_link,
 			),
 		);
 

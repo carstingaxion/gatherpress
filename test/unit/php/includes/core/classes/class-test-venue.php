@@ -90,6 +90,21 @@ class Test_Venue extends Base {
 	}
 
 	/**
+	 * Coverage for get_localized_post_type_slug method.
+	 *
+	 * @covers ::get_localized_post_type_slug
+	 *
+	 * @return void
+	 */
+	public function test_get_localized_post_type_slug(): void {
+		$this->assertSame(
+			'venue',
+			Venue::get_localized_post_type_slug(),
+			'Failed to assert that post type slug is same.'
+		);
+	}
+
+	/**
 	 * Coverage for register_post_meta method.
 	 *
 	 * @covers ::register_post_meta
@@ -265,6 +280,18 @@ class Test_Venue extends Base {
 			$term_object->slug,
 			$instance->get_venue_term_slug( $venue_after->post_name ),
 			'Failed to assert that slugs do not match.'
+		);
+
+		// Setting back to trash should update the term.
+		$venue_after->post_status = 'trash';
+		$instance->maybe_update_term_slug( $venue_before->ID, $venue_after, $venue_before );
+
+		$term_object = get_term( $term['term_id'] );
+
+		$this->assertSame(
+			$term_object->slug,
+			$instance->get_venue_term_slug( $venue_after->post_name ),
+			'Failed to assert that slugs match.'
 		);
 
 		// Setting back to publish should update the term.

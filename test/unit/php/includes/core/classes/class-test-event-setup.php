@@ -48,6 +48,12 @@ class Test_Event_Setup extends Base {
 				'callback' => array( $instance, 'delete_event' ),
 			),
 			array(
+				'type'     => 'action',
+				'name'     => 'wp_after_insert_post',
+				'priority' => 10,
+				'callback' => array( $instance, 'set_datetimes' ),
+			),
+			array(
 				'type'     => 'filter',
 				'name'     => sprintf( 'manage_%s_posts_custom_column', Event::POST_TYPE ),
 				'priority' => 10,
@@ -122,9 +128,10 @@ class Test_Event_Setup extends Base {
 
 		$meta = get_registered_meta_keys( 'post', Event::POST_TYPE );
 
-		$this->assertArrayNotHasKey( 'gatherpress_online_event_link', $meta, 'Failed to assert that gatherpress_online_event_link does not exist.' );
-		$this->assertArrayNotHasKey( 'gatherpress_enable_anonymous_rsvp', $meta, 'Failed to assert that gatherpress_enable_anonymous_rsvp does not exist.' );
-		$this->assertArrayNotHasKey( 'gatherpress_max_guest_limit', $meta, 'Failed to assert that gatherpress_max_guest_limit does not exist.' );
+		$this->assertArrayNotHasKey( 'online_event_link', $meta, 'Failed to assert that online_event_link does not exist.' );
+		$this->assertArrayNotHasKey( 'enable_anonymous_rsvp', $meta, 'Failed to assert that enable_anonymous_rsvp does not exist.' );
+		$this->assertArrayNotHasKey( 'max_attendance_limit', $meta, 'Failed to assert that max_guest_limit does not exist.' );
+		$this->assertArrayNotHasKey( 'max_guest_limit', $meta, 'Failed to assert that max_guest_limit does not exist.' );
 
 		$instance->register_post_meta();
 
@@ -155,6 +162,70 @@ class Test_Event_Setup extends Base {
 			$expects,
 			$instance->sortable_columns( $default ),
 			'Failed to assert correct sortable columns.'
+		);
+	}
+
+	/**
+	 * Coverage for set_datetimes method.
+	 *
+	 * @covers ::set_datetimes
+	 *
+	 * @return void
+	 */
+	public function test_set_datetimes(): void {
+		$instance = Event_Setup::get_instance();
+		$post_id  = $this->mock->post()->get()->ID;
+
+		$instance->set_datetimes( $post_id );
+		$this->assertEmpty(
+			get_post_meta( 'gatherpress_datetime_start' ),
+			'Failed to assert that datetime start meta is empty.'
+		);
+
+		$post_id = $this->mock->post(
+			array( 'post_type' => Event::POST_TYPE )
+		)->get()->ID;
+
+		$instance->set_datetimes( $post_id );
+		$this->assertEmpty(
+			get_post_meta( $post_id, 'gatherpress_datetime_start', true ),
+			'Failed to assert that datetime start meta is empty.'
+		);
+
+		$post_id = $this->mock->post(
+			array(
+				'post_type' => Event::POST_TYPE,
+				'post_meta' => array(
+					'gatherpress_datetime' => '{"dateTimeStart":"2019-09-18 18:00:00","dateTimeEnd":"2019-09-18 20:00:00","timezone":"America/New_York"}',
+				),
+			)
+		)->get()->ID;
+
+		$instance->set_datetimes( $post_id );
+		$this->assertSame(
+			'2019-09-18 18:00:00',
+			get_post_meta( $post_id, 'gatherpress_datetime_start', true ),
+			'Failed to assert that datetime start is expected value.'
+		);
+		$this->assertSame(
+			'2019-09-18 22:00:00',
+			get_post_meta( $post_id, 'gatherpress_datetime_start_gmt', true ),
+			'Failed to assert that datetime start gmt is expected value.'
+		);
+		$this->assertSame(
+			'2019-09-18 20:00:00',
+			get_post_meta( $post_id, 'gatherpress_datetime_end', true ),
+			'Failed to assert that datetime end is expected value.'
+		);
+		$this->assertSame(
+			'2019-09-19 00:00:00',
+			get_post_meta( $post_id, 'gatherpress_datetime_end_gmt', true ),
+			'Failed to assert that datetime end gmt is expected value.'
+		);
+		$this->assertSame(
+			'America/New_York',
+			get_post_meta( $post_id, 'gatherpress_timezone', true ),
+			'Failed to assert that timezone is expected value.'
 		);
 	}
 }

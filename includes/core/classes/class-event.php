@@ -264,7 +264,7 @@ class Event {
 	 *
 	 * @throws Exception If there is an issue while formatting the datetime value.
 	 */
-	protected function get_formatted_datetime(
+	public function get_formatted_datetime(
 		string $format = 'D, F j, g:ia T',
 		string $which = 'start',
 		bool $local = true
@@ -412,7 +412,7 @@ class Event {
 			$venue_information['full_address'] = $venue_meta->fullAddress ?? ''; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 			$venue_information['phone_number'] = $venue_meta->phoneNumber ?? ''; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 			$venue_information['website']      = $venue_meta->website ?? '';
-			$venue_information['permalink']    = get_permalink( $venue->ID ) ?? '';
+			$venue_information['permalink']    = (string) get_permalink( $venue->ID );
 		}
 
 		return $venue_information;
@@ -487,15 +487,17 @@ class Event {
 			$location .= sprintf( ', %s', $venue['full_address'] );
 		}
 
+		$params = array(
+			'action'   => 'TEMPLATE',
+			'text'     => sanitize_text_field( $this->event->post_title ),
+			'dates'    => sanitize_text_field( $datetime ),
+			'details'  => sanitize_text_field( $description ),
+			'location' => sanitize_text_field( $location ),
+			'sprop'    => 'name:',
+		);
+
 		return add_query_arg(
-			array(
-				'action'   => 'TEMPLATE',
-				'text'     => sanitize_text_field( $this->event->post_title ),
-				'dates'    => sanitize_text_field( $datetime ),
-				'details'  => sanitize_text_field( $description ),
-				'location' => sanitize_text_field( $location ),
-				'sprop'    => 'name:',
-			),
+			rawurlencode_deep( $params ),
 			'https://www.google.com/calendar/event'
 		);
 	}
@@ -523,8 +525,8 @@ class Event {
 		$duration    = ( ( strtotime( $diff_end ) - strtotime( $diff_start ) ) / 60 / 60 );
 		$full        = intval( $duration );
 		$fraction    = ( $duration - $full );
-		$hours       = str_pad( intval( $duration ), 2, '0', STR_PAD_LEFT );
-		$minutes     = str_pad( intval( $fraction * 60 ), 2, '0', STR_PAD_LEFT );
+		$hours       = str_pad( strval( $duration ), 2, '0', STR_PAD_LEFT );
+		$minutes     = str_pad( strval( $fraction * 60 ), 2, '0', STR_PAD_LEFT );
 		$venue       = $this->get_venue_information();
 		$location    = $venue['name'];
 		$description = $this->get_calendar_description();
@@ -533,17 +535,19 @@ class Event {
 			$location .= sprintf( ', %s', $venue['full_address'] );
 		}
 
+		$params = array(
+			'v'      => '60',
+			'view'   => 'd',
+			'type'   => '20',
+			'title'  => sanitize_text_field( $this->event->post_title ),
+			'st'     => sanitize_text_field( $datetime_start ),
+			'dur'    => sanitize_text_field( (string) $hours . (string) $minutes ),
+			'desc'   => sanitize_text_field( $description ),
+			'in_loc' => sanitize_text_field( $location ),
+		);
+
 		return add_query_arg(
-			array(
-				'v'      => '60',
-				'view'   => 'd',
-				'type'   => '20',
-				'title'  => sanitize_text_field( $this->event->post_title ),
-				'st'     => sanitize_text_field( $datetime_start ),
-				'dur'    => sanitize_text_field( (string) $hours . (string) $minutes ),
-				'desc'   => sanitize_text_field( $description ),
-				'in_loc' => sanitize_text_field( $location ),
-			),
+			rawurlencode_deep( $params ),
 			'https://calendar.yahoo.com/'
 		);
 	}
@@ -607,7 +611,7 @@ class Event {
 	 *
 	 * @return string The calendar event description with the event details link.
 	 */
-	protected function get_calendar_description(): string {
+	public function get_calendar_description(): string {
 		/* translators: %s: event link. */
 		return sprintf( __( 'For details go to %s', 'gatherpress' ), get_the_permalink( $this->event ) );
 	}
@@ -681,9 +685,24 @@ class Event {
 				$fields,
 				array( 'post_id' => $fields['post_id'] )
 			);
+
 			delete_transient( sprintf( self::DATETIME_CACHE_KEY, $fields['post_id'] ) );
 		} else {
 			$value = $wpdb->insert( $table, $fields ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		}
+
+		foreach ( $fields as $key => $field ) {
+			if ( 'post_id' === $key ) {
+				continue;
+			}
+
+			$meta_key = sprintf( 'gatherpress_%s', sanitize_key( $key ) );
+
+			update_post_meta(
+				$fields['post_id'],
+				$meta_key,
+				sanitize_text_field( $field )
+			);
 		}
 
 		return (bool) $value;

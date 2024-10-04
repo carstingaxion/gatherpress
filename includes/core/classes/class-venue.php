@@ -98,6 +98,8 @@ class Venue {
 	 * @return void
 	 */
 	public function register_post_type(): void {
+		$settings     = Settings::get_instance();
+		$rewrite_slug = $settings->get_value( 'general', 'urls', 'venues' );
 		register_post_type(
 			self::POST_TYPE,
 			array(
@@ -131,11 +133,38 @@ class Venue {
 				'template'     => array(
 					array( 'gatherpress/venue' ),
 				),
+				'has_archive'  => true,
 				'rewrite'      => array(
-					'slug' => _x( 'venue', 'Post Type Slug', 'gatherpress' ),
+					'slug'       => $rewrite_slug,
+					'with_front' => false,
 				),
 			)
 		);
+	}
+
+	/**
+	 * Returns the post type slug localized for the site language and sanitized as URL part.
+	 *
+	 * Do not use this directly, use get_value( 'general', 'urls', 'venues' ) instead.
+	 *
+	 * This method switches to the sites default language and gets the translation of 'venues' for the loaded locale.
+	 * After that, the method sanitizes the string to be safely used within an URL,
+	 * by removing accents, replacing special characters and replacing whitespace with dashes.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string
+	 */
+	public static function get_localized_post_type_slug(): string {
+		$switched_locale = switch_to_locale( get_locale() );
+		$slug            = _x( 'venue', 'Post Type Slug', 'gatherpress' );
+		$slug            = sanitize_title( $slug );
+
+		if ( $switched_locale ) {
+			restore_previous_locale();
+		}
+
+		return $slug;
 	}
 
 	/**
@@ -190,7 +219,10 @@ class Venue {
 			self::TAXONOMY,
 			Event::POST_TYPE,
 			array(
-				'labels'             => array(),
+				'labels'             => array(
+					'name'          => _x( 'Venues', 'Taxonomy General Name', 'gatherpress' ),
+					'singular_name' => _x( 'Venue', 'Taxonomy Singular Name', 'gatherpress' ),
+				),
 				'hierarchical'       => false,
 				'public'             => true,
 				'show_ui'            => false,
@@ -261,8 +293,15 @@ class Venue {
 			return;
 		}
 
-		// Only proceed if the venue post is being published.
-		if ( 'publish' !== $post_after->post_status ) {
+		// Only proceed if the venue post is being published or trashed.
+		if ( ! in_array(
+			$post_after->post_status,
+			array(
+				'publish',
+				'trash',
+			),
+			true
+		) ) {
 			return;
 		}
 
@@ -292,7 +331,7 @@ class Venue {
 			} else {
 				// Update the existing term with the new name and slug.
 				wp_update_term(
-					$term['term_id'],
+					intval( $term['term_id'] ),
 					self::TAXONOMY,
 					array(
 						'name' => $title,

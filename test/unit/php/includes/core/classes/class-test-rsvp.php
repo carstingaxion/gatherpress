@@ -11,6 +11,7 @@ namespace GatherPress\Tests\Core;
 use GatherPress\Core\Rsvp;
 use PMC\Unit_Test\Base;
 use PMC\Unit_Test\Utility;
+use WP_Error;
 
 /**
  * Class Test_Rsvp.
@@ -109,6 +110,23 @@ class Test_Rsvp extends Base {
 		$rsvp      = new Rsvp( $post->ID );
 		$user_1_id = $this->factory->user->create();
 		$this->assertSame( 2, $rsvp->save( $user_1_id, 'attending', 0, 3 )['guests'], 'Failed to assert that user 1 can only bring 2 guests at most.' );
+
+		// Simulate error saving RSVP.
+		add_filter( 'query', '__return_false' );
+
+		$result   = $rsvp->save( $user_1_id, 'attending' );
+		$expected = array(
+			'post_id'   => 0,
+			'user_id'   => 0,
+			'timestamp' => '0000-00-00 00:00:00',
+			'status'    => 'no_status',
+			'guests'    => 0,
+			'anonymous' => 0,
+		);
+
+		$this->assertEquals( $expected, $result );
+
+		remove_filter( 'query', '__return_false' );
 	}
 
 	/**
@@ -141,9 +159,9 @@ class Test_Rsvp extends Base {
 		$rsvp->save( $user_4_id, 'attending' );
 
 		$this->assertSame( 'attending', $rsvp->get( $user_1_id )['status'], 'Failed to assert user 1 is attending.' );
-		$this->assertSame( 'attending', $rsvp->get( $user_2_id )['status'], 'Failed to asser user 2 is attending.' );
-		$this->assertSame( 'waiting_list', $rsvp->get( $user_3_id )['status'], 'Failed to asser user 3 is on waiting list.' );
-		$this->assertSame( 'waiting_list', $rsvp->get( $user_3_id )['status'], 'Failed to asser user 4 is on waiting list.' );
+		$this->assertSame( 'attending', $rsvp->get( $user_2_id )['status'], 'Failed to assert user 2 is attending.' );
+		$this->assertSame( 'waiting_list', $rsvp->get( $user_3_id )['status'], 'Failed to assert user 3 is on waiting list.' );
+		$this->assertSame( 'waiting_list', $rsvp->get( $user_3_id )['status'], 'Failed to assert user 4 is on waiting list.' );
 		$this->assertEquals( 0, $rsvp->check_waiting_list(), 'Failed to assert expected waiting list value.' );
 
 		$rsvp->save( $user_1_id, 'not_attending' );
@@ -151,7 +169,7 @@ class Test_Rsvp extends Base {
 		// Give it a slight delay to move member from waiting_list to attending (w/o test sometimes fails).
 		sleep( 1 );
 
-		$this->assertSame( 'attending', $rsvp->get( $user_3_id )['status'], 'Failed to asser user 3 is on attending.' );
+		$this->assertSame( 'attending', $rsvp->get( $user_3_id )['status'], 'Failed to assert user 3 is on attending.' );
 		$this->assertSame( 0, $rsvp->check_waiting_list(), 'Failed to assert expected waiting list value.' );
 
 		$rsvp->save( $user_1_id, 'attending' );
@@ -161,9 +179,9 @@ class Test_Rsvp extends Base {
 		$this->assertEquals( 2, $rsvp->check_waiting_list(), 'Failed to assert expected waiting list value.' );
 
 		$this->assertSame( 'attending', $rsvp->get( $user_1_id )['status'], 'Failed to assert user 1 is attending.' );
-		$this->assertSame( 'attending', $rsvp->get( $user_2_id )['status'], 'Failed to asser user 2 is attending.' );
-		$this->assertSame( 'attending', $rsvp->get( $user_3_id )['status'], 'Failed to asser user 3 is attending.' );
-		$this->assertSame( 'attending', $rsvp->get( $user_3_id )['status'], 'Failed to asser user 4 is attending.' );
+		$this->assertSame( 'attending', $rsvp->get( $user_2_id )['status'], 'Failed to assert user 2 is attending.' );
+		$this->assertSame( 'attending', $rsvp->get( $user_3_id )['status'], 'Failed to assert user 3 is attending.' );
+		$this->assertSame( 'attending', $rsvp->get( $user_3_id )['status'], 'Failed to assert user 4 is attending.' );
 	}
 
 	/**
@@ -247,6 +265,9 @@ class Test_Rsvp extends Base {
 
 		wp_delete_user( $user_id_2 );
 
+		// User will remain while cached until it expires.
+		wp_cache_delete( sprintf( Rsvp::CACHE_KEY, $post->ID ), GATHERPRESS_CACHE_GROUP );
+
 		$responses = $rsvp->responses();
 
 		$this->assertEmpty(
@@ -326,13 +347,22 @@ class Test_Rsvp extends Base {
 		$newer = array( 'timestamp' => '2023-05-11 08:30:00' );
 		$older = array( 'timestamp' => '2022-05-11 08:30:00' );
 
-		$this->assertTrue(
-			$rsvp->sort_by_timestamp( $newer, $older ),
-			'Failed to assert correct sorting of timestamp.'
-		);
-		$this->assertFalse(
+		$this->assertSame(
+			-1,
 			$rsvp->sort_by_timestamp( $older, $newer ),
-			'Failed to assert correct sorting of timestamp.'
+			'Failed to assert that it returns a negative number while the first response\'s timestamp is earlier.'
+		);
+
+		$this->assertSame(
+			1,
+			$rsvp->sort_by_timestamp( $newer, $older ),
+			'Failed to assert that it returns a positive number while the second response\'s timestamp is earlier.'
+		);
+
+		$this->assertSame(
+			0,
+			$rsvp->sort_by_timestamp( $newer, $newer ),
+			'Failed to assert that it returns 0 while both response\'s timestamps are equal.'
 		);
 	}
 }
