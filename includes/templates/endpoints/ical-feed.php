@@ -5,6 +5,7 @@
  * This template is used to render an ical feed to the browser.
  *
  * It can be replaced by theme authors and will override this existing template.
+ *
  * @see /docs/developer/theme-customizations/README.md
  *
  * @package GatherPress\Core
