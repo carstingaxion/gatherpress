@@ -115,20 +115,7 @@ class Event_Setup {
 				'public'        => true,
 				'hierarchical'  => false,
 				'template'      => array(
-					array( 'gatherpress/event-date' ),
-					array( 'gatherpress/add-to-calendar' ),
-					array( 'gatherpress/venue' ),
-					array( 'gatherpress/rsvp' ),
-					array(
-						'core/paragraph',
-						array(
-							'placeholder' => __(
-								'Add a description of the event and let people know what to expect, including the agenda, what they need to bring, and how to find the group.',
-								'gatherpress'
-							),
-						),
-					),
-					array( 'gatherpress/rsvp-response' ),
+					array( 'core/pattern', array( 'slug' => 'gatherpress/event-template' ) ),
 				),
 				'menu_position' => 4,
 				'supports'      => array(
@@ -165,8 +152,8 @@ class Event_Setup {
 	 */
 	public static function get_localized_post_type_slug(): string {
 		$switched_locale = switch_to_locale( get_locale() );
-		$slug            = _x( 'event', 'Post Type Slug', 'gatherpress' );
-		$slug            = sanitize_title( $slug, '', 'save' );
+		$slug            = _x( 'Event', 'Post Type Singular Name', 'gatherpress' );
+		$slug            = sanitize_title( $slug );
 		if ( $switched_locale ) {
 			restore_previous_locale();
 		}
@@ -330,7 +317,7 @@ class Event_Setup {
 			return;
 		}
 
-		$table = sprintf( Event::TABLE_FORMAT, $wpdb->prefix, Event::POST_TYPE );
+		$table = sprintf( Event::TABLE_FORMAT, $wpdb->prefix );
 
 		$wpdb->delete( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$table,
