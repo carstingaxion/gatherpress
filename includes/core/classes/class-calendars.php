@@ -256,7 +256,7 @@ class Calendars {
 			// Get all terms, associated with the current event-post.
 			$terms = get_terms(
 				array(
-					'taxonomy'   => get_object_taxonomies( get_queried_object_id() ),
+					'taxonomy'   => get_object_taxonomies( get_queried_object() ),
 					'object_ids' => get_queried_object_id(),
 				)
 			);
