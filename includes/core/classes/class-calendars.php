@@ -507,8 +507,8 @@ class Calendars {
 		$datetime_start = sprintf( '%sT%sZ', $date_start, $time_start );
 
 		// Figure out duration of event in hours and minutes: hhmm format.
-		$diff_start  = $event->get_formatted_datetime( self::DATETIME_FORMAT, 'start', false );
-		$diff_end    = $event->get_formatted_datetime( self::DATETIME_FORMAT, 'end', false );
+		$diff_start  = $event->get_formatted_datetime( $event::DATETIME_FORMAT, 'start', false );
+		$diff_end    = $event->get_formatted_datetime( $event::DATETIME_FORMAT, 'end', false );
 		$duration    = ( ( strtotime( $diff_end ) - strtotime( $diff_start ) ) / 60 / 60 );
 		$full        = intval( $duration );
 		$fraction    = ( $duration - $full );
