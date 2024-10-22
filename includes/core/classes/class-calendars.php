@@ -19,6 +19,7 @@ namespace GatherPress\Core;
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
 
+use Exception;
 use GatherPress\Core\Endpoints\Posttype_Single_Endpoint;
 use GatherPress\Core\Endpoints\Posttype_Single_Feed_Endpoint;
 use GatherPress\Core\Endpoints\Posttype_Feed_Endpoint;
