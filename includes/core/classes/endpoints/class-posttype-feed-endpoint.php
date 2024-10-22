@@ -74,7 +74,7 @@ class Posttype_Feed_Endpoint extends Endpoint {
 	 * @return bool True if the current request is a valid feed request for the post type archive.
 	 */
 	public function is_valid(): bool {
-		return is_archive( $this->type_object->name ) && is_feed();
+		return is_post_type_archive( $this->type_object->name ) && is_feed();
 	}
 
 	/**
