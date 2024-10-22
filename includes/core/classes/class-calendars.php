@@ -332,7 +332,7 @@ class Calendars {
 			function ( $link ) {
 				printf(
 					'<link rel="alternate" type="%s" title="%s" href="%s" />' . "\n",
-					esc_attr( isset( $link['type'] ) ? $link['type'] : 'text/calendar' ),
+					esc_attr( 'text/calendar' ),
 					esc_attr( $link['attr'] ),
 					esc_url( $link['url'] )
 				);
