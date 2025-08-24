@@ -79,8 +79,200 @@ class Event_Setup {
 		add_filter( 'get_the_date', array( $this, 'get_the_event_date' ) );
 		add_filter( 'the_time', array( $this, 'get_the_event_date' ) );
 		add_filter( 'display_post_states', array( $this, 'set_event_archive_labels' ), 10, 2 );
+		
+		if (is_admin()) {
+			// https://snippets.webaware.com.au/snippets/custom-post-names-for-wordpress-custom-post-types/
+			// NB: AJAX action priority < 1 so we can beat WordPress to it!
+			// add_action('wp_ajax_sample-permalink', array( $this, 'cbstdsys_ajax_eo_change_post_slug' ), 0);
+			// add_filter('name_save_pre', array( $this, 'cbstdsys_eo_change_post_slug' ));
+		
+		}
+		// add_filter( 'wp_unique_post_slug', array( $this, 'cbstdsys_filter_eo_change_post_slug' ), 10, 4 );
+		/**
+		 * Filters the sample permalink.
+		 *
+		 * @param array    $permalink { Array containing the sample permalink with placeholder for the post name, and the post name. @type string $0 The permalink with placeholder for the post name. @type string $1 The post name.
+}
+		 * @param int      $post_id   Post ID.
+		 * @param string   $title     Post title.
+		 * @param string   $name      Post name (slug).
+		 * @param \WP_Post $post      Post object.
+		 * @return array { Array containing the sample permalink with placeholder for the post name, and the post name. @type string $0 The permalink with placeholder for the post name. @type string $1 The post name.
+}
+		 */
+		add_filter('get_sample_permalink',function( array $permalink, int $post_id, string $title, string $name, \WP_Post $post ) : array {
+			error_log(var_export($permalink,true));
+
+			// return $permalink;
+			return array( $permalink[0], 'my-custom-slug');
+		}, 10, 5 );
+	}
+/*
+ * Fires authenticated Ajax actions for logged-in users.
+ *
+add_action('wp_ajax_{$action}',function() : void {
+	
+} )
+ */
+
+/*
+ * Filters the value of a specific field before saving.
+ *
+ * @param mixed $value Value of the post field.
+ * @return mixed Value of the post field.
+
+add_filter('{$field_no_prefix}_save_pre',function( $value ) {
+	
+	return $value;
+} )
+ */	
+
+
+
+
+/**/
+public function cbstdsys_filter_eo_change_post_slug( $slug, $post_ID, $post_status, $post_type ) {
+	if ( Event::POST_TYPE == $post_type && $post_ID ) {
+		$post = get_post($post_ID);
+		remove_filter( 'wp_unique_post_slug', array( $this, 'cbstdsys_filter_eo_change_post_slug' ), 10 );
+		// $slug = $this->cbstdsys_eo_generate_post_slug( $post, $post->post_title );
+		$slug = $this->cbstdsys_eo_generate_post_slug( $post, $slug );
+		add_filter( 'wp_unique_post_slug', array( $this, 'cbstdsys_filter_eo_change_post_slug' ), 10, 4 );
+	}
+	return $slug;
+}
+
+
+
+/**
+* intercept AJAX call for regenerating sample permalink, and add some extra bits where required
+*/
+public function cbstdsys_ajax_eo_change_post_slug() {
+	// check that we're dealing with a event, and editing the slug
+	$post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
+	$post_name = isset($_POST['new_slug'])? $_POST['new_slug'] : null;
+	$new_title = isset($_POST['new_title'])? $_POST['new_title'] : null;
+
+	if ($post_id && $post_name === '') {
+		$post = get_post($post_id);
+
+		if ($post->post_type == Event::POST_TYPE) {
+			// generate new slug
+#			$_new_slug = cbstdsys_eo_generate_post_slug($post, $new_title);
+#			$_POST['new_slug'] = remove_accents( wp_unique_post_slug($_new_slug, $post->ID, $post->post_status, $post->post_type, $post->post_parent) );
+			$_POST['new_slug'] = $this->cbstdsys_eo_generate_post_slug($post, $new_title);
+
+		}
+	}
+}
+
+/**
+* intercept the post name and generate a new one if required
+* @param string $post_name
+* @return string
+*/
+public function cbstdsys_eo_change_post_slug($post_name) {
+	// check that we're dealing with a event, and editing the slug
+	$post_id = isset($_POST['post_ID']) ? intval($_POST['post_ID']) : 0;
+	$new_title = isset($_POST['post_title']) ? $_POST['post_title'] : 0;
+
+	if ($post_id && $post_name === '') {
+		$post = get_post($post_id);
+		if ($post->post_type == Event::POST_TYPE && $post->post_status != 'auto-draft') {
+			// generate new slug
+			$post_name = $this->cbstdsys_eo_generate_post_slug($post, $new_title);
+			// make sure that it's unique
+#			$post_name = remove_accents( wp_unique_post_slug($post_name, $post->ID, $post->post_status, $post->post_type, $post->post_parent) );
+
+		}
 	}
 
+	return $post_name;
+}
+
+/**
+* generate new post_name for event
+* @param WP_Post $post
+* @param string $new_title
+* @return string
+*/
+public function cbstdsys_eo_generate_post_slug($post, $new_title) {
+
+	$event_year = $venue_id = $event_venue_name = $event_venue_city = '';
+
+	if ( 0 === $new_title || null === $new_title )
+		$new_title = $post->post_title;
+
+	if ( isset($_POST['eo_input']['StartDate']) && !empty( $_POST['eo_input']['StartDate'] ) ) {
+		$event_year = new DateTime( $_POST['eo_input']['StartDate'] );
+		$event_year = $event_year->format('Y');
+	}
+	if ( !$event_year && function_exists('eo_get_the_start') ) {
+		$event_year = eo_get_the_start( 'Y', $post->ID, 0 );
+	}
+
+	if ( isset($_POST['eo_input']['event-venue']) && !empty( $_POST['eo_input']['event-venue'] ) ) {
+		$venue_id = intval($_POST['eo_input']['event-venue']);
+	}
+	if ( !$venue_id && function_exists('eo_get_venue') ) {
+		$venue_id = eo_get_venue( $post->ID );
+	}
+
+	if ( isset($_POST['eo_venue']['name']) && !empty( $_POST['eo_venue']['name'] ) ) {
+		$event_venue_name = $_POST['eo_venue']['name'];
+	}
+	if ( !$event_venue_name && function_exists('eo_get_venue_name') && $venue_id ) {
+		$event_venue_name = eo_get_venue_name( $venue_id );
+	}
+
+	if ( isset($_POST['eo_venue']['city']) && !empty( $_POST['eo_venue']['city'] ) ) {
+		$event_venue_city = $_POST['eo_venue']['city'];
+	}
+	if ( !$event_venue_city && function_exists('eo_get_venue_address') && $venue_id ) {
+		$event_venue_adress = eo_get_venue_address( $venue_id );
+		$event_venue_city = $event_venue_adress['city'];
+	}
+
+
+	// MAYBE TODO // bit ugly
+	// Remove "City" from "Venue Name", to prevent duplication in URL
+	// e.g .../taschen--schaubude-berlin-berlin--2018
+	// have to be REMOVED because off this like this, happened
+	// https://juliaraab.test/termine/die-dicke-spielt-medea-junge-er-buehne-ulm-2/
+/*	if ( '' !== $event_venue_city && '' !== $event_venue_name ) {
+		$event_venue_name = str_replace($event_venue_city, '', $event_venue_name);
+	}*/
+
+	// collate into an array, and join the non-empty elements
+	$parts = array(
+		'gatherpest',
+		$new_title, 
+#		'--', 
+		$event_venue_name, 
+		$event_venue_city, 
+#		'--', 
+		$event_year
+	);
+	$post_name = implode('-', array_filter($parts, 'strlen'));
+/*
+
+# DEBUG Output
+wp_die(var_export(array( 
+	'$parts' 		=>	$parts,
+	'$post_name' 	=>	$post_name,
+	'sanitize $post_name' 	=>	strtolower(sanitize_title_with_dashes($post_name))
+)));*/
+
+
+	// make the post name "browser friendly"
+#	$post_name = strtolower( sanitize_title_with_dashes( $post_name ) );
+	$post_name = sanitize_title( $post_name );
+
+	// make sure that it's unique
+	$post_name = wp_unique_post_slug($post_name, $post->ID, $post->post_status, $post->post_type, $post->post_parent);
+
+	return $post_name;
+}
 	/**
 	 * Registers the custom post type for Events.
 	 *
