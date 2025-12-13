@@ -23,6 +23,7 @@ import NotifyMembersPanel from './notify-members';
 import OnlineEventLinkPanel from './online-link';
 import VenueSelectorPanel from './venue-selector';
 import { EventPluginDocumentSettings } from './slot';
+import PermalinkUpdater from '../../components/PermalinkUpdater';
 
 /**
  * A settings panel for event-specific settings in the block editor.
@@ -46,6 +47,7 @@ const EventSettings = () => {
 			>
 				{ /* Extendable entry point for "Event Settings" panel. */ }
 				<EventPluginDocumentSettings.Slot />
+				<PermalinkUpdater />
 
 				<VStack spacing={ 4 }>
 					<DateTimeRangePanel />

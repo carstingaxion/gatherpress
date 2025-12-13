@@ -88,6 +88,8 @@ class Event_Setup {
 		
 		}
 		// add_filter( 'wp_unique_post_slug', array( $this, 'cbstdsys_filter_eo_change_post_slug' ), 10, 4 );
+
+
 		/**
 		 * Filters the sample permalink.
 		 *

@@ -14,6 +14,11 @@ import './stores';
 import './supports/post-id-override';
 import './supports/block-guard';
 
+
+
+
+
+
 /**
  * Ensure Panels are Open for Events
  *
@@ -44,6 +49,8 @@ domReady( () => {
 	subscribe( triggerEventCommunication );
 
 	hasEventPastNotice();
+
+	// setEditedPostAttributes();
 } );
 
 /**
