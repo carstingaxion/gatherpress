@@ -47,7 +47,7 @@
 	"homepage": "https://github.com/GatherPress/gatherpress#readme",
 	"devDependencies": {
 		"@jest/globals": "^29.7.0",
-		"@playwright/test": "^1.42.1",
+		"@playwright/test": "^1.57.0",
 		"@testing-library/jest-dom": "^6.4.2",
 		"@testing-library/react": "^14.2.1",
 		"@wordpress/api-fetch": "^6.50.0",
@@ -65,16 +65,16 @@
 		"@wordpress/i18n": "^4.53.0",
 		"@wordpress/notices": "^4.21.0",
 		"@wordpress/plugins": "^6.21.0",
-		"@wordpress/scripts": "^27.4.0",
+		"@wordpress/scripts": "^31.3.0",
 		"classnames": "^2.5.1",
 		"dotenv": "^16.4.5",
 		"eslint": "^8.57.0",
 		"html-react-parser": "^5.1.9",
 		"jest-sonar-reporter": "^2.0.0",
-		"lodash": "^4.17.21",
+		"lodash": "^4.17.23",
 		"moment": "^2.30.1",
 		"moment-timezone": "^0.5.45",
-		"playwright": "^1.42.1",
+		"playwright": "^1.57.0",
 		"react-modal": "^3.16.1",
 		"react-tooltip": "^5.26.3"
 	}
