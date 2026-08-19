@@ -2,6 +2,8 @@ import { addFilter } from '@wordpress/hooks';
 import { InspectorControls } from '@wordpress/block-editor';
 import { PanelBody, ToggleControl, RangeControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
+import { registerBlockBindingsSource } from '@wordpress/blocks';
+
 
 /**
  * Adds a GatherPress map binding toggle to image/cover block inspectors.
@@ -101,4 +103,13 @@ addFilter(
     withMapBindingControls
 );
 
-console.log( 'GatherPress map binding controls added to image and cover blocks.' );
+registerBlockBindingsSource( {
+    name: 'gatherpress/map-image',
+    getValues( { bindings, context } ) {
+        // Compute or fetch the static map URL client-side
+        return {
+            // url: buildStaticMapUrl( bindings.url.args ),
+            url: 'https://gatherpress.test/wp-content/uploads/gatherpress/static-maps/wuk-theater-quartier-holzplatz-7a-halle-saale-osm-roadmap-14-800-400.png',
+        };
+    },
+} );
