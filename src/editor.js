@@ -9,6 +9,7 @@ import { dispatch, select } from '@wordpress/data';
  */
 import { hasEventPastNotice } from './helpers/event';
 import EmailNotificationManager from './components/EmailNotificationManager';
+import './helpers/static-maps';
 import './commands';
 import './stores';
 import './supports/post-id-override';

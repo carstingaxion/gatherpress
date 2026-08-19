@@ -34,6 +34,7 @@ use GatherPress\Core\Traits\Singleton;
 use GatherPress\Core\Venue\Setup;
 use GatherPress\Core\Venue;
 use GdImage;
+use WP_Block;
 use WP_Post;
 
 /**
@@ -301,8 +302,77 @@ final class Map {
 		// React to provider changes so a `map_platform` switch schedules
 		// the same prewarm pass that runs on theme switches.
 		add_action( 'update_option_gatherpress_settings', array( $this, 'maybe_handle_settings_change' ), 10, 2 );
-	}
 
+add_action( 'init', function(): void {
+    register_block_bindings_source(
+        'gatherpress/map-image',
+        [
+            'label'              => __( 'GatherPress Map', 'gatherpress' ),
+            'get_value_callback' => array( $this, 'get_map_binding_value' ),
+            'uses_context'       => [ 'postId', 'postType' ],
+        ]
+    );
+} );
+	}
+/**
+ * Returns the bound value for a given map image attribute.
+ *
+ * @param array    $source_args The arguments from the binding metadata.
+ * @param WP_Block $block_instance The current block instance.
+ * @param string   $attribute_name The attribute being bound (e.g., 'url', 'alt').
+ * @return string|null
+ */
+public function get_map_binding_value(
+    array $source_args,
+    WP_Block $block_instance,
+    string $attribute_name
+): ?string {
+    $post_id = $block_instance->context['postId'] ?? get_the_ID();
+
+    if ( ! $post_id ) {
+        return null;
+    }
+	$post_type      = $block_instance->context['postType'] ?? get_post_type( $post_id );
+	$zoom           = (int) ( $source_args['zoom'] ?? Map::DEFAULT_ZOOM );
+	$default_height = (int) Settings::get_instance()->get( 'venue_map_default_height' );
+	$raw_height     = (int) ( $source_args['height'] ?? $default_height );
+	$ratio          = (string) ( $source_args['aspectRatio'] ?? Map::DEFAULT_ASPECT_RATIO );
+	$map_type       = (string) ( $source_args['type'] ?? Map::DEFAULT_MAP_TYPE );
+
+	$venue_setup = Setup::get_instance();
+	$venue_meta  = $venue_setup->get_venue_meta( $post_id, $post_type );
+	$address = (string) ( $venue_meta['address'] ?? '' );
+
+	$static_map_descriptor = Map::get_instance()->get_descriptor_for_post(
+		$post_id,
+		$post_type,
+		$zoom,
+		0,
+		$raw_height,
+		$ratio,
+		$map_type
+	);
+    switch ( $attribute_name ) {
+        case 'url':
+        case 'src':     // core/cover uses 'url', core/image uses 'url'
+            return null !== $static_map_descriptor
+				? $static_map_descriptor['url']
+				: '';
+
+        case 'alt':
+            return sprintf(
+                /* translators: %s: venue name */
+                __( 'Map showing location of %s', 'gatherpress' ),
+                sanitize_text_field( $address ?? '' )
+            );
+
+        case 'title':
+            return sanitize_text_field( $address ?? '' );
+
+        default:
+            return null;
+    }
+}
 	/**
 	 * Schedule a re-prewarm sweep when `map_platform` changes value.
 	 *
