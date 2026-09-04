@@ -1,13 +1,9 @@
 /**
- * External dependencies.
- */
-import moment from 'moment';
-
-/**
- * WordPress dependencies.
+ * WordPress dependencies
  */
 import {
 	Button,
+	DateTimePicker,
 	Dropdown,
 	Flex,
 	FlexItem,
@@ -15,82 +11,110 @@ import {
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { useEffect } from '@wordpress/element';
+import { useDispatch, useSelect } from '@wordpress/data';
 
 /**
- * Internal dependencies.
+ * Internal dependencies
  */
-import { DateTimeStartLabel, DateTimeStartPicker } from './DateTime';
+import { getStartOfWeek } from '../helpers/editor';
 import { hasEventPastNotice } from '../helpers/event';
-import { Broadcaster } from '../helpers/broadcasting';
 import {
-	dateTimeMomentFormat,
-	getDateTimeStart,
-	getTimeZone,
+	createMomentWithTimezone,
+	dateTimeDatabaseFormat,
+	dateTimeLabelFormat,
+	dateTimeOffset,
+	getTimezone,
+	updateDateTimeStart,
+	useMatchedDuration,
 } from '../helpers/datetime';
+import { getSettings } from '@wordpress/date';
 
 /**
  * DateTimeStart component for GatherPress.
  *
  * This component manages the selection of the start date and time. It uses
  * DateTimeStartPicker for the user to pick the date and time. The selected
- * values are formatted and broadcasted using Broadcaster. The component
- * subscribes to the saveDateTime function and triggers the hasEventPastNotice
- * function to handle any event past notices.
+ * values are formatted and saved. The component subscribes to the saveDateTime
+ * function and triggers the hasEventPastNotice function to handle any event past notices.
  *
- * @since 1.0.0
- *
- * @param {Object}   props                  - Component properties.
- * @param {string}   props.dateTimeStart    - The current start date and time.
- * @param {Function} props.setDateTimeStart - Function to set the start date and time.
+ * @since 0.27.0
  *
  * @return {JSX.Element} The rendered React component.
  */
-const DateTimeStart = (props) => {
-	const { dateTimeStart, setDateTimeStart } = props;
+const DateTimeStart = () => {
+	const dateTimeStart = useSelect(
+		( select ) => select( 'gatherpress/datetime' ).getDateTimeStart(),
+		[],
+	);
+	// Use the memoized matched-preset hook so the gating below only fires
+	// the auto-end-sync when the current end actually equals start + N
+	// hours — same semantics as the previous getDuration selector, but
+	// without that selector's per-call moment.tz comparison loop (#1607).
+	const duration = useMatchedDuration();
+	const { setDateTimeStart, setDateTimeEnd } = useDispatch(
+		'gatherpress/datetime',
+	);
+	const settings = getSettings();
+	const is12HourTime = /a(?!\\)/i.test(
+		settings.formats.time
+			.toLowerCase()
+			.replaceAll( '\\\\', '' )
+			.split( '' )
+			.reverse()
+			.join( '' ),
+	);
 
-	useEffect(() => {
+	useEffect( () => {
 		setDateTimeStart(
-			moment
-				.tz(getDateTimeStart(), getTimeZone())
-				.format(dateTimeMomentFormat)
+			createMomentWithTimezone( dateTimeStart, getTimezone() )
+				.format( dateTimeDatabaseFormat ),
 		);
 
-		Broadcaster({
-			setDateTimeStart: dateTimeStart,
-		});
+		if ( duration ) {
+			setDateTimeEnd( dateTimeOffset( duration ) );
+		}
 
 		hasEventPastNotice();
-	});
+	}, [ dateTimeStart, duration, setDateTimeStart, setDateTimeEnd ] );
 
 	return (
 		<PanelRow>
-			<Flex direction="column" gap="0">
+			<Flex direction="column" gap="1">
 				<FlexItem>
-					<label htmlFor="gatherpress-datetime-start">
-						{__('Start', 'gatherpress')}
-					</label>
+					<h3 style={ { marginBottom: 0 } }>
+						<label htmlFor="gatherpress-datetime-start">
+							{ __( 'Date & time start', 'gatherpress' ) }
+						</label>
+					</h3>
 				</FlexItem>
 				<FlexItem>
 					<Dropdown
-						popoverProps={{ placement: 'bottom-end' }}
-						renderToggle={({ isOpen, onToggle }) => (
+						popoverProps={ { placement: 'bottom-end' } }
+						renderToggle={ ( { isOpen, onToggle } ) => (
 							<Button
 								id="gatherpress-datetime-start"
-								onClick={onToggle}
-								aria-expanded={isOpen}
-								isLink
+								onClick={ onToggle }
+								aria-expanded={ isOpen }
+								variant="link"
 							>
-								<DateTimeStartLabel
-									dateTimeStart={dateTimeStart}
-								/>
+								{ createMomentWithTimezone( dateTimeStart, getTimezone() )
+									.format( dateTimeLabelFormat() ) }
 							</Button>
-						)}
-						renderContent={() => (
-							<DateTimeStartPicker
-								dateTimeStart={dateTimeStart}
-								setDateTimeStart={setDateTimeStart}
+						) }
+						renderContent={ () => (
+							<DateTimePicker
+								currentDate={ dateTimeStart }
+								onChange={ ( date ) => {
+									updateDateTimeStart(
+										date,
+										setDateTimeStart,
+										setDateTimeEnd,
+									);
+								} }
+								is12Hour={ is12HourTime }
+								startOfWeek={ getStartOfWeek() }
 							/>
-						)}
+						) }
 					/>
 				</FlexItem>
 			</Flex>

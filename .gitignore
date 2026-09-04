@@ -25,6 +25,7 @@ nbproject
 
 # Node #
 ##########
+build
 node_modules
 npm-debug.log
 typings
@@ -32,6 +33,7 @@ typings
 # Composer #
 ##########
 vendor
+phpstan.neon
 
 # .wp-env #
 ##########
@@ -39,19 +41,28 @@ wp-core
 .phpunit.result.cache
 coverage.xml
 .env
+.wp-env.override.json
+mu-plugins/
 
 # Playwright #
 ##########
+artifacts/
 playwright-report/
 test-results/
-add-new-event.png
-event-page.png
-new-venue.png
-vanue-page.png
+storageState.json
 
 # Jest / SonarCloud #
 ##########
 coverage
 test-report.xml
 
+# Claude Code #
+##########
+.claude
+
 *.zip
+coverage-multisite.xml
+
+# Editor swap files.
+*.swp
+*.swo

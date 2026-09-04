@@ -1,34 +1,22 @@
 /**
- * External dependencies.
+ * External dependencies
  */
 import moment from 'moment';
 
 /**
- * WordPress dependencies.
+ * WordPress dependencies
  */
-import { select } from '@wordpress/data';
-import apiFetch from '@wordpress/api-fetch';
 import { __ } from '@wordpress/i18n';
-import { createRoot } from '@wordpress/element';
+import { createRoot, useMemo } from '@wordpress/element';
+import { applyFilters } from '@wordpress/hooks';
+import { select, useSelect } from '@wordpress/data';
 
 /**
- * Internal dependencies.
+ * Internal dependencies
  */
-import { enableSave, getFromGlobal, setToGlobal } from './globals';
-import { isEventPostType, triggerEventCommuncation } from './event';
+import { getFromSettings } from './editor-settings';
+import { enableSave } from './editor';
 import DateTimePreview from '../components/DateTimePreview';
-
-/**
- * Date and time format string for use with Moment.js.
- *
- * This format is designed to represent date and time in the format
- * "YYYY-MM-DDTHH:mm:ss" for compatibility with Moment.js library.
- *
- * @since 1.0.0
- *
- * @type {string}
- */
-export const dateTimeMomentFormat = 'YYYY-MM-DDTHH:mm:ss';
 
 /**
  * Database-compatible date and time format string for storage.
@@ -36,40 +24,278 @@ export const dateTimeMomentFormat = 'YYYY-MM-DDTHH:mm:ss';
  * This format is designed to represent date and time in the format
  * "YYYY-MM-DD HH:mm:ss" for compatibility with database storage.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @type {string}
  */
 export const dateTimeDatabaseFormat = 'YYYY-MM-DD HH:mm:ss';
 
 /**
+ * Get the default start date and time for an event.
+ * It is set to the current date and time plus one day at 18:00:00 in the application's timezone.
+ *
+ * @since 0.27.0
+ *
+ * @return {string} Formatted default start date and time in the application's timezone.
+ */
+function getDefaultDateTimeStart() {
+	const timezone = getTimezone();
+	return createMomentWithTimezone(
+		moment().format( 'YYYY-MM-DD HH:mm:ss' ),
+		timezone
+	)
+		.add( 1, 'day' )
+		.set( 'hour', 18 )
+		.set( 'minute', 0 )
+		.set( 'second', 0 )
+		.format( dateTimeDatabaseFormat );
+}
+
+/**
  * The default start date and time for an event.
  * It is set to the current date and time plus one day at 18:00:00 in the application's timezone.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @type {string} Formatted default start date and time in the application's timezone.
  */
-export const defaultDateTimeStart = moment
-	.tz(getTimeZone())
-	.add(1, 'day')
-	.set('hour', 18)
-	.set('minute', 0)
-	.set('second', 0)
-	.format(dateTimeMomentFormat);
+export const defaultDateTimeStart = getDefaultDateTimeStart();
+
+/**
+ * Get the default end date and time for an event.
+ * It is calculated based on the default start date and time plus two hours in the application's timezone.
+ *
+ * @since 0.27.0
+ *
+ * @return {string} Formatted default end date and time in the application's timezone.
+ */
+function getDefaultDateTimeEnd() {
+	const timezone = getTimezone();
+	const startDateTime = getDefaultDateTimeStart();
+	return createMomentWithTimezone( startDateTime, timezone )
+		.add( getDefaultDuration(), 'hours' )
+		.format( dateTimeDatabaseFormat );
+}
 
 /**
  * The default end date and time for an event.
  * It is calculated based on the default start date and time plus two hours in the application's timezone.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @type {string} Formatted default end date and time in the application's timezone.
  */
-export const defaultDateTimeEnd = moment
-	.tz(defaultDateTimeStart, getTimeZone())
-	.add(2, 'hours')
-	.format(dateTimeMomentFormat);
+export const defaultDateTimeEnd = getDefaultDateTimeEnd();
+
+/**
+ * Predefined duration options for event scheduling.
+ *
+ * This array contains a list of duration options in hours that can be selected
+ * for an event. Each option includes a label for display and a corresponding
+ * value representing the duration in hours. The last option allows the user
+ * to set a custom end time by selecting `false`.
+ *
+ * @since 0.27.0
+ *
+ * @property {string}         label - The human-readable label for the duration option.
+ * @property {number|boolean} value - The value representing the duration in hours, or `false` if a custom end time is to be set.
+ */
+
+export function durationOptions() {
+	const options = [
+		{
+			label: __( '1 hour', 'gatherpress' ),
+			value: 1,
+		},
+		{
+			label: __( '1.5 hours', 'gatherpress' ),
+			value: 1.5,
+		},
+		{
+			label: __( '2 hours', 'gatherpress' ),
+			value: 2,
+		},
+		{
+			label: __( '3 hours', 'gatherpress' ),
+			value: 3,
+		},
+		{
+			label: __( 'Set an end time…', 'gatherpress' ),
+			value: false,
+		},
+	];
+
+	return applyFilters( 'gatherpress.durationOptions', options );
+}
+
+/**
+ * Resolve the default event duration, in hours, from the available options.
+ *
+ * The preferred default starts at 2h and can be overridden via the
+ * `gatherpress.durationDefault` filter. That preferred value is used when it
+ * is one of the (possibly filtered) `durationOptions`; otherwise it falls back
+ * to the first option that represents a real duration — skipping the `false`
+ * "Set an end time…" sentinel — so the default always maps to a selectable
+ * preset. Without this, a new event's end defaulted to start + 2h even when 2
+ * was not offered, no preset matched, and the Duration select was replaced by
+ * the end-time picker (#1706). Returns the preferred value as a last resort
+ * when no numeric option exists at all.
+ *
+ * @since 0.34.0
+ *
+ * @return {number} The default duration in hours.
+ */
+export function getDefaultDuration() {
+	/**
+	 * Filters the preferred default event duration, in hours.
+	 *
+	 * The returned value is honored when it matches one of the available
+	 * `durationOptions`; otherwise GatherPress falls back to the first real
+	 * duration in the list so the Duration select always has a matching preset.
+	 *
+	 * @since 0.34.0
+	 *
+	 * @param {number} value The preferred default duration in hours. Default 2.
+	 */
+	const defaultValue = applyFilters( 'gatherpress.durationDefault', 2 );
+
+	const options = durationOptions();
+
+	if ( options.some( ( option ) => defaultValue === option.value ) ) {
+		return defaultValue;
+	}
+
+	const firstNumeric = options.find(
+		( option ) => 'number' === typeof option.value,
+	);
+
+	return firstNumeric ? firstNumeric.value : defaultValue;
+}
+
+/**
+ * Calculates an offset in hours from the start date and time of an event.
+ *
+ * This function retrieves the event's start date and time, applies the provided
+ * offset in hours, and returns the result formatted for database storage.
+ *
+ * @since 0.27.0
+ *
+ * @param {number} hours - The number of hours to offset from the event's start date and time.
+ *
+ * @return {string} The adjusted date and time formatted in a database-compatible format.
+ */
+export function dateTimeOffset( hours ) {
+	return createMomentWithTimezone( getDateTimeStart(), getTimezone() )
+		.add( hours, 'hours' )
+		.format( dateTimeDatabaseFormat );
+}
+
+/**
+ * Retrieves the duration offset based on the end time of the event.
+ *
+ * This function checks the available duration options and compares
+ * the offset value with the calculated end time of the event. If a
+ * matching offset is found, it returns the corresponding value. If
+ * no match is found, it returns false.
+ *
+ * @since 0.27.0
+ *
+ * @return {number|boolean} The matching duration value or false if no match is found.
+ */
+export function getDateTimeOffset() {
+	return (
+		durationOptions().find(
+			( option ) => dateTimeOffset( option.value ) === getDateTimeEnd(),
+		)?.value || false
+	);
+}
+
+/**
+ * Pure matched-preset lookup. Given a start/end/timezone/duration tuple,
+ * returns the duration option whose `(start + value hours)` matches the
+ * given end, or `false` when no preset matches (or when the caller has
+ * explicitly opted out by passing `false` for `duration`).
+ *
+ * Extracted from `useMatchedDuration` so the matching logic is testable
+ * in isolation — the hook is just a `useSelect`/`useMemo` wrapper around
+ * this function.
+ *
+ * @since 0.27.0
+ *
+ * @param {string}         dateTimeStart Start datetime string.
+ * @param {string}         dateTimeEnd   End datetime string.
+ * @param {string}         timezone      Timezone (IANA name or manual offset).
+ * @param {number|boolean} duration      Raw stored duration: `false` to
+ *                                       opt out, anything else to compute.
+ * @return {number|boolean} Matched duration option value, or `false`.
+ */
+export function findMatchedDuration(
+	dateTimeStart,
+	dateTimeEnd,
+	timezone,
+	duration,
+) {
+	if ( false === duration ) {
+		return false;
+	}
+	return (
+		durationOptions().find( ( option ) => {
+			const computedEnd = createMomentWithTimezone(
+				dateTimeStart,
+				timezone,
+			)
+				.add( option.value, 'hours' )
+				.format( dateTimeDatabaseFormat );
+			return computedEnd === dateTimeEnd;
+		} )?.value || false
+	);
+}
+
+/**
+ * Reactive, memoized matched-preset duration for the event datetime range.
+ *
+ * Returns the duration option whose `(start + value hours)` matches the
+ * current end, or `false` when no preset matches (or when the user has
+ * explicitly opted out via `setDuration(false)`). Components use this to
+ * decide between rendering `<Duration />` (preset mode) vs `<DateTimeEnd />`
+ * (absolute mode) and to drive the duration `<SelectControl>`'s value.
+ *
+ * Why a hook instead of a store selector: the previous `getDuration`
+ * selector ran the full `dateTimeOffset` × N moment.tz comparison on every
+ * call, which @wordpress/data invokes once per subscriber per render. Under
+ * IANA timezones the multiplied moment.tz cost compounded with the WP
+ * picker's render cascade and overflowed the call stack on a single
+ * year-arrow keypress (#1607). Computing in a `useMemo` keyed on the
+ * actual inputs runs the comparison once per real change instead.
+ *
+ * @since 0.27.0
+ *
+ * @return {number|boolean} Matched duration option value, or `false`.
+ */
+export function useMatchedDuration() {
+	const dateTimeStart = useSelect(
+		( s ) => s( 'gatherpress/datetime' ).getDateTimeStart(),
+		[],
+	);
+	const dateTimeEnd = useSelect(
+		( s ) => s( 'gatherpress/datetime' ).getDateTimeEnd(),
+		[],
+	);
+	const timezone = useSelect(
+		( s ) => s( 'gatherpress/datetime' ).getTimezone(),
+		[],
+	);
+	const duration = useSelect(
+		( s ) => s( 'gatherpress/datetime' ).getDuration(),
+		[],
+	);
+
+	return useMemo(
+		() =>
+			findMatchedDuration( dateTimeStart, dateTimeEnd, timezone, duration ),
+		[ dateTimeStart, dateTimeEnd, timezone, duration ],
+	);
+}
 
 /**
  * Get the combined date and time format for event labels.
@@ -77,75 +303,121 @@ export const defaultDateTimeEnd = moment
  * This function retrieves the date and time formats from global settings
  * and combines them to create a formatted label for event start and end times.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @return {string} The combined date and time format for event labels.
  */
 export function dateTimeLabelFormat() {
 	const dateFormat = convertPHPToMomentFormat(
-		getFromGlobal('settings.dateFormat')
+		getFromSettings( 'dateFormat' ),
 	);
 	const timeFormat = convertPHPToMomentFormat(
-		getFromGlobal('settings.timeFormat')
+		getFromSettings( 'timeFormat' ),
 	);
 
 	return dateFormat + ' ' + timeFormat;
 }
 
 /**
+ * Checks if a timezone string is a manual offset (like +05:00 or -12:00).
+ *
+ * Manual offsets start with + or - and cannot be used with moment.tz().
+ *
+ * @since 0.27.0
+ *
+ * @param {string} timezone - The timezone string to check.
+ *
+ * @return {boolean} True if the timezone is a manual offset, false otherwise.
+ */
+export function isManualOffset( timezone ) {
+	return /^[+-]\d{2}:\d{2}$/.test( timezone );
+}
+
+/**
+ * Creates a moment object with the correct timezone handling.
+ *
+ * For IANA timezone identifiers (like 'America/New_York'), uses moment.tz().
+ * For manual offsets (like '+05:00'), uses moment with utcOffset, keeping local time.
+ *
+ * @since 0.27.0
+ *
+ * @param {string} datetime - The datetime string to parse.
+ * @param {string} timezone - The timezone or offset to use.
+ *
+ * @return {Object} A moment object with the correct timezone applied.
+ */
+export function createMomentWithTimezone( datetime, timezone ) {
+	if ( isManualOffset( timezone ) ) {
+		// For manual offsets, parse the datetime and apply the offset while keeping the local time.
+		// The 'true' parameter keeps the local time the same.
+		return moment( datetime ).utcOffset( timezone, true );
+	}
+
+	// For IANA timezone identifiers, use moment.tz().
+	return moment.tz( datetime, timezone );
+}
+
+/**
  * Retrieves the timezone for the application based on the provided timezone or the global setting.
  * If the provided timezone is invalid, the default timezone is set to 'GMT'.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @param {string} timezone - The timezone to be used, defaults to the global setting 'event_datetime.timezone'.
  *
  * @return {string} The retrieved timezone, or 'GMT' if the provided timezone is invalid.
  */
-export function getTimeZone(
-	timezone = getFromGlobal('eventDetails.dateTime.timezone')
+export function getTimezone(
+	timezone = select( 'gatherpress/datetime' )?.getTimezone?.() ?? '',
 ) {
-	if (!!moment.tz.zone(timezone)) {
+	// Manual offsets (like +05:00) are valid, return as-is.
+	if ( isManualOffset( timezone ) ) {
 		return timezone;
 	}
 
-	return __('GMT', 'gatherpress');
+	// For IANA timezone identifiers, validate with moment.tz.
+	if ( moment.tz.zone( timezone ) ) {
+		return timezone;
+	}
+
+	return __( 'GMT', 'gatherpress' );
 }
 
 /**
  * Retrieves the UTC offset for a given timezone.
  * If the timezone is not set to 'GMT', an empty string is returned.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @param {string} timezone - The timezone for which to retrieve the UTC offset.
  *
  * @return {string} UTC offset without the colon if the timezone is set to 'GMT', otherwise an empty string.
  */
-export function getUtcOffset(timezone) {
-	timezone = getTimeZone(timezone);
+export function getUtcOffset( timezone ) {
+	timezone = getTimezone( timezone );
 
-	if (__('GMT', 'gatherpress') !== timezone) {
-		return '';
+	if ( __( 'GMT', 'gatherpress' ) === timezone ) {
+		const offset =
+			select( 'gatherpress/datetime' )?.getTimezone?.() ?? '';
+
+		return maybeConvertUtcOffsetForDisplay( offset );
 	}
 
-	const offset = getFromGlobal('eventDetails.dateTime.timezone');
-
-	return maybeConvertUtcOffsetForDisplay(offset);
+	return '';
 }
 
 /**
  * Converts a UTC offset string to a format suitable for display,
  * removing the colon (:) between hours and minutes.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @param {string} offset - The UTC offset string to be converted.
  *
  * @return {string} Converted UTC offset without the colon, suitable for display.
  */
-export function maybeConvertUtcOffsetForDisplay(offset = '') {
-	return offset.replace(':', '');
+export function maybeConvertUtcOffsetForDisplay( offset = '' ) {
+	return offset.replace( ':', '' );
 }
 
 /**
@@ -153,59 +425,59 @@ export function maybeConvertUtcOffsetForDisplay(offset = '') {
  * The function accepts offsets in the form of 'UTC+HH:mm', 'UTC-HH:mm', 'UTC+HH', or 'UTC-HH'.
  * The resulting format is '+HH:mm' or '-HH:mm'.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @param {string} offset - The UTC offset string to be converted.
  *
  * @return {string} Converted UTC offset in the format '+HH:mm' or '-HH:mm'.
  */
-export function maybeConvertUtcOffsetForDatabase(offset = '') {
-	// Regex: https://regex101.com/r/9bMgJd/2.
-	const pattern = /^UTC([+-])(\d+)(.\d+)?$/;
-	const sign = offset.replace(pattern, '$1');
+export function maybeConvertUtcOffsetForDatabase( offset = '' ) {
+	// Regex: https://regex101.com/r/9bMgJd/3.
+	const pattern = /^UTC([+-])(\d+)(\.\d+)?$/;
+	const sign = offset.replace( pattern, '$1' );
 
-	if (sign !== offset) {
-		const hour = offset.replace(pattern, '$2').padStart(2, '0');
-		let minute = offset.replace(pattern, '$3');
-
-		if ('' === minute) {
-			minute = ':00';
-		}
-
-		minute = minute
-			.replace('.25', ':15')
-			.replace('.5', ':30')
-			.replace('.75', ':45');
-
-		return sign + hour + minute;
+	if ( sign === offset ) {
+		return offset;
 	}
 
-	return offset;
+	const hour = offset.replace( pattern, '$2' ).padStart( 2, '0' );
+	let minute = offset.replace( pattern, '$3' );
+
+	if ( '' === minute ) {
+		minute = ':00';
+	}
+
+	minute = minute
+		.replace( '.25', ':15' )
+		.replace( '.5', ':30' )
+		.replace( '.75', ':45' );
+
+	return sign + hour + minute;
 }
 
 /**
  * Converts a UTC offset string to a format suitable for dropdown selection,
  * specifically in the format '+HH:mm' or '-HH:mm'.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @param {string} offset - The UTC offset string to be converted.
  *
  * @return {string} Converted UTC offset in the format '+HH:mm' or '-HH:mm'.
  */
-export function maybeConvertUtcOffsetForSelect(offset = '') {
+export function maybeConvertUtcOffsetForSelect( offset = '' ) {
 	// Regex: https://regex101.com/r/nOXCPo/2.
 	const pattern = /^([+-])(\d{2}):(00|15|30|45)$/;
-	const sign = offset.replace(pattern, '$1');
+	const sign = offset.replace( pattern, '$1' );
 
-	if (sign !== offset) {
-		const hour = parseInt(offset.replace(pattern, '$2')).toString();
+	if ( sign !== offset ) {
+		const hour = parseInt( offset.replace( pattern, '$2' ) ).toString();
 		const minute = offset
-			.replace(pattern, '$3')
-			.replace('00', '')
-			.replace('15', '.25')
-			.replace('30', '.5')
-			.replace('45', '.75');
+			.replace( pattern, '$3' )
+			.replace( '00', '' )
+			.replace( '15', '.25' )
+			.replace( '30', '.5' )
+			.replace( '45', '.75' );
 
 		return 'UTC' + sign + hour + minute;
 	}
@@ -218,21 +490,19 @@ export function maybeConvertUtcOffsetForSelect(offset = '') {
  * If the start date and time is not set, it defaults to a predefined value.
  * The formatted datetime is then stored in the global settings for future access.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @return {string} The formatted start date and time for the event.
  */
 export function getDateTimeStart() {
-	let dateTime = getFromGlobal('eventDetails.dateTime.datetime_start');
+	const dateTime =
+		select( 'gatherpress/datetime' )?.getDateTimeStart?.() ?? '';
 
-	dateTime =
-		'' !== dateTime
-			? moment.tz(dateTime, getTimeZone()).format(dateTimeMomentFormat)
-			: defaultDateTimeStart;
-
-	setToGlobal('eventDetails.dateTime.datetime_start', dateTime);
-
-	return dateTime;
+	return '' === dateTime
+		? defaultDateTimeStart
+		: createMomentWithTimezone( dateTime, getTimezone() ).format(
+			dateTimeDatabaseFormat,
+		);
 }
 
 /**
@@ -240,171 +510,186 @@ export function getDateTimeStart() {
  * If the end date and time is not set, it defaults to a predefined value.
  * The formatted datetime is then stored in the global settings for future access.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @return {string} The formatted end date and time for the event.
  */
 export function getDateTimeEnd() {
-	let dateTime = getFromGlobal('eventDetails.dateTime.datetime_end');
+	const dateTime =
+		select( 'gatherpress/datetime' )?.getDateTimeEnd?.() ?? '';
 
-	dateTime =
-		'' !== dateTime
-			? moment.tz(dateTime, getTimeZone()).format(dateTimeMomentFormat)
-			: defaultDateTimeEnd;
-
-	setToGlobal('eventDetails.dateTime.datetime_end', dateTime);
-
-	return dateTime;
+	return '' === dateTime
+		? defaultDateTimeEnd
+		: createMomentWithTimezone( dateTime, getTimezone() ).format(
+			dateTimeDatabaseFormat,
+		);
 }
 
 /**
  * Updates the start date and time for an event, performs validation, and triggers the save functionality.
  *
- * @since 1.0.0
+ * This function sets the new start date and time of the event, validates the input
+ * to ensure it meets the required criteria, and updates the global state. It also
+ * triggers a save action if the `enableSave` function is available. If a `setDateTimeStart`
+ * callback is provided, it is invoked with the new date.
  *
- * @param {string}   date             - The new start date and time to be set.
- * @param {Function} setDateTimeStart - Optional callback function to update the state or perform additional actions.
+ * @since 0.27.0
+ *
+ * @param {string}        date             - The new start date and time to be set in a valid format.
+ * @param {Function|null} setDateTimeStart - Optional callback function to update the state or perform additional actions with the new start date.
+ * @param {Function|null} setDateTimeEnd   - Optional callback function to update the end date, if validation requires an update.
  *
  * @return {void}
  */
-export function updateDateTimeStart(date, setDateTimeStart = null) {
-	validateDateTimeStart(date);
+export function updateDateTimeStart(
+	date,
+	setDateTimeStart = null,
+	setDateTimeEnd = null,
+) {
+	// Capture the matched preset BEFORE we dispatch the new start so the
+	// lookup runs against the previous start/end pair — we're trying to
+	// detect "was the event in relative (preset-duration) mode?", which is
+	// a property of the OLD state.
+	const currentDuration = getDateTimeOffset();
 
-	setToGlobal('eventDetails.dateTime.datetime_start', date);
+	// Dispatch the new start FIRST so the validation cascade below — which
+	// reads the start back via `select( 'gatherpress/datetime' )...` — sees
+	// the new value rather than the stale one. Without this, year-down on
+	// the start picker in relative mode (#1607) computed a new end that's
+	// less than the OLD store start, `validateDateTimeEnd` then recursively
+	// called `updateDateTimeStart` to fix the gap, and the recursion never
+	// terminated because the store never got updated inside the synchronous
+	// chain. Stack overflowed inside `moment.tz`. This mirrors the previous
+	// `setToGlobal( 'eventDetails.dateTime.datetime_start', date )` write
+	// that the old global-object architecture used to perform here.
+	if ( 'function' === typeof setDateTimeStart ) {
+		setDateTimeStart( date );
+	}
 
-	if ('function' === typeof setDateTimeStart) {
-		setDateTimeStart(date);
+	// If in relative mode (duration is numeric), always update the end time to maintain the offset.
+	if ( 'number' === typeof currentDuration ) {
+		const dateTimeEnd = createMomentWithTimezone( date, getTimezone() )
+			.add( currentDuration, 'hours' )
+			.format( dateTimeDatabaseFormat );
+
+		updateDateTimeEnd( dateTimeEnd, setDateTimeEnd );
+	} else {
+		// Otherwise, only validate to ensure end is after start.
+		validateDateTimeStart( date, setDateTimeEnd, currentDuration );
 	}
 
 	enableSave();
 }
 
 /**
- * Update the end date and time of the event and trigger necessary actions.
+ * Updates the end date and time of the event and triggers necessary actions.
  *
  * This function sets the end date and time of the event to the specified value,
- * validates the input, and triggers additional actions such as updating the UI.
+ * validates the input, and triggers additional actions such as updating the UI and
+ * enabling save functionality. The `setDateTimeEnd` callback can be used to update
+ * the UI with the new end date and time, if provided. Optionally, `setDateTimeStart`
+ * can be used for validation against the start date and time.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
- * @param {string}        date           - The new end date and time in a valid format.
- * @param {Function|null} setDateTimeEnd - Optional callback to update the UI with the new end date and time.
+ * @param {string}        date             - The new end date and time in a valid format.
+ * @param {Function|null} setDateTimeEnd   - Optional callback to update the UI with the new end date and time.
+ * @param {Function|null} setDateTimeStart - Optional callback for validating the end date against the start date.
  *
  * @return {void}
  */
-export function updateDateTimeEnd(date, setDateTimeEnd = null) {
-	validateDateTimeEnd(date);
-
-	setToGlobal('eventDetails.dateTime.datetime_end', date);
-
-	if (null !== setDateTimeEnd) {
-		setDateTimeEnd(date);
+export function updateDateTimeEnd(
+	date,
+	setDateTimeEnd = null,
+	setDateTimeStart = null,
+) {
+	// Dispatch the new end FIRST so any subsequent reads of the end via
+	// `select( 'gatherpress/datetime' ).getDateTimeEnd()` (e.g. through
+	// `validateDateTimeStart` if a recursive call back into the start path
+	// fires) see the new value rather than the stale store value. Same
+	// reasoning as the matching reorder in `updateDateTimeStart` (#1607).
+	if ( null !== setDateTimeEnd ) {
+		setDateTimeEnd( date );
 	}
+
+	validateDateTimeEnd( date, setDateTimeStart );
 
 	enableSave();
 }
 
 /**
- * Validate the start date and time of the event and perform necessary adjustments if needed.
+ * Validates the start date and time of the event and performs necessary adjustments if needed.
  *
  * This function compares the provided start date and time with the current end date
  * and time of the event. If the start date is greater than or equal to the end date,
- * it adjusts the end date to ensure a minimum two-hour duration.
+ * it adjusts the end date. If there's an active duration (relative mode), it maintains
+ * that duration offset. Otherwise, it defaults to a two-hour duration.
+ * If `setDateTimeEnd` is provided, it updates the end date accordingly.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
- * @param {string} dateTimeStart - The start date and time in a valid format.
+ * @param {string}        dateTimeStart   - The start date and time in a valid format.
+ * @param {Function|null} setDateTimeEnd  - Optional callback to update the end date and time.
+ * @param {number|false}  currentDuration - The current duration in hours (numeric for relative mode, false for absolute mode).
  *
  * @return {void}
  */
-export function validateDateTimeStart(dateTimeStart) {
-	const dateTimeEndNumeric = moment
-		.tz(getFromGlobal('eventDetails.dateTime.datetime_end'), getTimeZone())
-		.valueOf();
-	const dateTimeStartNumeric = moment
-		.tz(dateTimeStart, getTimeZone())
-		.valueOf();
+export function validateDateTimeStart( dateTimeStart, setDateTimeEnd = null, currentDuration = null ) {
+	const tz = getTimezone();
+	const dateTimeEndNumeric = createMomentWithTimezone(
+		select( 'gatherpress/datetime' )?.getDateTimeEnd?.() ?? '',
+		tz,
+	).valueOf();
+	const dateTimeStartNumeric = createMomentWithTimezone(
+		dateTimeStart,
+		tz,
+	).valueOf();
 
-	if (dateTimeStartNumeric >= dateTimeEndNumeric) {
-		const dateTimeEnd = moment
-			.tz(dateTimeStartNumeric, getTimeZone())
-			.add(2, 'hours')
-			.format(dateTimeMomentFormat);
+	if ( dateTimeStartNumeric >= dateTimeEndNumeric ) {
+		// Use the passed duration if available, otherwise check current offset.
+		// Only use duration if it's numeric (relative mode), not if it's false (absolute mode).
+		const duration = null === currentDuration ? getDateTimeOffset() : currentDuration;
+		const hoursToAdd = ( false !== duration && 'number' === typeof duration ) ? duration : getDefaultDuration();
 
-		updateDateTimeEnd(dateTimeEnd);
+		const dateTimeEnd = createMomentWithTimezone( dateTimeStartNumeric, tz )
+			.add( hoursToAdd, 'hours' )
+			.format( dateTimeDatabaseFormat );
+
+		updateDateTimeEnd( dateTimeEnd, setDateTimeEnd );
 	}
 }
 
 /**
- * Validate the end date and time of the event and perform necessary adjustments if needed.
+ * Validates the end date and time of the event and performs necessary adjustments if needed.
  *
  * This function compares the provided end date and time with the current start date
  * and time of the event. If the end date is less than or equal to the start date,
- * it adjusts the start date to ensure a minimum two-hour duration.
+ * it adjusts the start date to ensure a minimum two-hour duration from the end date.
+ * If `setDateTimeStart` is provided, it updates the start date accordingly.
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
- * @param {string} dateTimeEnd - The end date and time in a valid format.
- *
- * @return {void}
- */
-export function validateDateTimeEnd(dateTimeEnd) {
-	const dateTimeStartNumeric = moment
-		.tz(
-			getFromGlobal('eventDetails.dateTime.datetime_start'),
-			getTimeZone()
-		)
-		.valueOf();
-	const dateTimeEndNumeric = moment.tz(dateTimeEnd, getTimeZone()).valueOf();
-
-	if (dateTimeEndNumeric <= dateTimeStartNumeric) {
-		const dateTimeStart = moment
-			.tz(dateTimeEndNumeric, getTimeZone())
-			.subtract(2, 'hours')
-			.format(dateTimeMomentFormat);
-		updateDateTimeStart(dateTimeStart);
-	}
-}
-
-/**
- * Save the event date, time, and timezone to the server.
- *
- * This function sends a POST request to the server with the updated event date,
- * time, and timezone information for storage. It is triggered during the process
- * of saving an event post in the WordPress editor.
- *
- * @since 1.0.0
+ * @param {string}        dateTimeEnd      - The end date and time in a valid format.
+ * @param {Function|null} setDateTimeStart - Optional callback to update the start date and time.
  *
  * @return {void}
  */
-export function saveDateTime() {
-	const isSavingPost = select('core/editor').isSavingPost(),
-		isAutosavingPost = select('core/editor').isAutosavingPost();
+export function validateDateTimeEnd( dateTimeEnd, setDateTimeStart = null ) {
+	const tz = getTimezone();
+	const dateTimeStartNumeric = createMomentWithTimezone(
+		select( 'gatherpress/datetime' )?.getDateTimeStart?.() ?? '',
+		tz,
+	).valueOf();
+	const dateTimeEndNumeric = createMomentWithTimezone(
+		dateTimeEnd,
+		tz,
+	).valueOf();
 
-	if (isEventPostType() && isSavingPost && !isAutosavingPost) {
-		apiFetch({
-			path: getFromGlobal('urls.eventRestApi') + '/datetime',
-			method: 'POST',
-			data: {
-				post_id: getFromGlobal('eventDetails.postId'),
-				datetime_start: moment
-					.tz(
-						getFromGlobal('eventDetails.dateTime.datetime_start'),
-						getTimeZone()
-					)
-					.format(dateTimeDatabaseFormat),
-				datetime_end: moment
-					.tz(
-						getFromGlobal('eventDetails.dateTime.datetime_end'),
-						getTimeZone()
-					)
-					.format(dateTimeDatabaseFormat),
-				timezone: getFromGlobal('eventDetails.dateTime.timezone'),
-				_wpnonce: getFromGlobal('misc.nonce'),
-			},
-		}).then(() => {
-			triggerEventCommuncation();
-		});
+	if ( dateTimeEndNumeric <= dateTimeStartNumeric ) {
+		const dateTimeStart = createMomentWithTimezone( dateTimeEndNumeric, tz )
+			.subtract( getDefaultDuration(), 'hours' )
+			.format( dateTimeDatabaseFormat );
+		updateDateTimeStart( dateTimeStart, setDateTimeStart );
 	}
 }
 
@@ -416,12 +701,13 @@ export function saveDateTime() {
  *
  * @see https://gist.github.com/neilrackett/7881b5bef4cb4ae63af5c3a6a244cffa
  *
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @param {string} format - The PHP date format to be converted.
+ *
  * @return {string} The equivalent Moment.js date format.
  */
-export function convertPHPToMomentFormat(format) {
+export function convertPHPToMomentFormat( format ) {
 	const replacements = {
 		d: 'DD',
 		D: 'ddd',
@@ -461,17 +747,17 @@ export function convertPHPToMomentFormat(format) {
 		r: '', // no equivalent
 		U: 'X',
 	};
-	return String(format)
-		.split('')
-		.map((chr, index, elements) => {
+	return String( format )
+		.split( '' )
+		.map( ( chr, index, elements ) => {
 			// Allow the format string to contain escaped chars, like ES or DE needs
-			const last = elements[index - 1];
-			if (chr in replacements && last !== '\\') {
-				return replacements[chr];
+			const last = elements[ index - 1 ];
+			if ( chr in replacements && '\\' !== last ) {
+				return replacements[ chr ];
 			}
 			return chr;
-		})
-		.join('');
+		} )
+		.join( '' );
 }
 
 /**
@@ -482,24 +768,84 @@ export function convertPHPToMomentFormat(format) {
  * It iterates through all matching elements and initializes a DateTimePreview component
  * with the attributes provided in the 'data-gatherpress_component_attrs' attribute.
  *
- * @since 1.0.0
+ * @since 0.27.0
  */
 export function dateTimePreview() {
 	// Select all elements with the attribute 'data-gatherpress_component_name' set to 'datetime-preview'.
 	const dateTimePreviewContainers = document.querySelectorAll(
-		`[data-gatherpress_component_name="datetime-preview"]`
+		`[data-gatherpress_component_name="datetime-preview"]`,
 	);
 
 	// Iterate through each matched element and initialize DateTimePreview component.
-	for (let i = 0; i < dateTimePreviewContainers.length; i++) {
+	for ( const container of dateTimePreviewContainers ) {
 		// Parse attributes from the 'data-gatherpress_component_attrs' attribute.
 		const attrs = JSON.parse(
-			dateTimePreviewContainers[i].dataset.gatherpress_component_attrs
+			container.dataset.gatherpress_component_attrs,
 		);
 
 		// Create a root element and render the DateTimePreview component with the parsed attributes.
-		createRoot(dateTimePreviewContainers[i]).render(
-			<DateTimePreview attrs={attrs} />
+		createRoot( container ).render(
+			<DateTimePreview attrs={ attrs } />,
 		);
 	}
+}
+
+/**
+ * Non-time PHP Date format characters
+ *
+ * @since 0.27.0
+ *
+ * @see https://www.php.net/manual/en/datetime.format.php
+ *
+ * @type {Array}
+ */
+export const phpNonTimeFormatChars = [
+	'd',
+	'D',
+	'j',
+	'l',
+	'N',
+	'S',
+	'w',
+	'z',
+	'W',
+	'F',
+	'm',
+	'M',
+	'n',
+	't',
+	'L',
+	'o',
+	'X',
+	'x',
+	'Y',
+	'y',
+	'e',
+	'I',
+	'O',
+	'P',
+	'p',
+	'T',
+	'Z',
+	'c',
+	'r',
+	'U',
+	',',
+];
+
+/**
+ * Remove non-time characters from PHP format string
+ *
+ * @since 0.27.0
+ *
+ * @param {string} format - The PHP datetime format.
+ *
+ * @return {string} The PHP time-only format.
+ */
+export function removeNonTimePHPFormatChars( format ) {
+	return format
+		.split( '' )
+		.filter( ( char ) => ! phpNonTimeFormatChars.includes( char ) )
+		.join( '' )
+		.trim();
 }

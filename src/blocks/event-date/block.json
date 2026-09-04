@@ -1,23 +1,97 @@
 {
 	"$schema": "https://schemas.wp.org/trunk/block.json",
-	"apiVersion": 2,
+	"apiVersion": 3,
 	"name": "gatherpress/event-date",
-	"version": "1.0.1",
+	"version": "2.0.0",
 	"title": "Event Date",
 	"category": "gatherpress",
 	"icon": "clock",
-	"example": {},
+	"example": {
+		"viewportWidth": 350
+	},
 	"description": "Displays the date and time for an event.",
+	"usesContext": [ "postId", "postType", "queryId" ],
 	"attributes": {
 		"eventEnd": {
 			"type": "string"
 		},
 		"eventStart": {
 			"type": "string"
+		},
+		"displayType": {
+			"type": "string",
+			"default": "both"
+		},
+		"isLink": {
+			"type": "boolean",
+			"default": false,
+			"role": "content"
+		},
+		"startDateFormat": {
+			"type": "string",
+			"default": ""
+		},
+		"endDateFormat": {
+			"type": "string",
+			"default": ""
+		},
+		"separator": {
+			"type": "string",
+			"default": "to",
+			"role": "content"
+		},
+		"showTimezone": {
+			"type": "string",
+			"default": ""
 		}
 	},
 	"supports": {
-		"html": false
+		"gatherpress": {
+			"postIdOverride": true
+		},
+		"html": false,
+		"color": {
+			"gradients": true,
+			"link": true,
+			"__experimentalDefaultControls": {
+				"background": true,
+				"text": true,
+				"link": true
+			}
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"typography": {
+			"textAlign": true,
+			"fontSize": true,
+			"lineHeight": true,
+			"__experimentalFontFamily": true,
+			"__experimentalFontWeight": true,
+			"__experimentalFontStyle": true,
+			"__experimentalTextTransform": true,
+			"__experimentalTextDecoration": true,
+			"__experimentalLetterSpacing": true,
+			"__experimentalDefaultControls": {
+				"fontSize": true
+			}
+		},
+		"interactivity": {
+			"clientNavigation": true
+		},
+		"__experimentalBorder": {
+			"radius": true,
+			"color": true,
+			"width": true,
+			"style": true,
+			"__experimentalDefaultControls": {
+				"radius": true,
+				"color": true,
+				"width": true,
+				"style": true
+			}
+		}
 	},
 	"textdomain": "gatherpress",
 	"editorScript": "file:./index.js",

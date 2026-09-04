@@ -1,0 +1,35 @@
+# Thin caller for the reusable screenshot-generation workflow: regenerates
+# the wordpress.org plugin-assets screenshots (.wordpress-org) for every
+# locale with more than 90% complete plugin translations on
+# https://translate.wordpress.org/projects/wp-plugins/gatherpress/
+
+name: WordPress.org screenshot generation
+
+on:
+  workflow_dispatch:
+    inputs:
+      updateAllSnapshots:
+        description: 'Replace all existing images? (By default only images with noticeable changes will be updated.)'
+        required: false
+        type: 'boolean'
+        default: 'false' # Needs to be a string, see https://graphite.dev/guides/github-actions-inputs#handling-boolean-inputs
+
+# Cancels all previous workflow runs.
+concurrency:
+  # The concurrency group contains the workflow name and the commit hash.
+  group: ${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    permissions:
+      pull-requests: write
+      contents: write  # Grant write permissions for the contents scope to allow pushing changes
+    uses: ./.github/workflows/screenshot-generation.yml
+    with:
+      locales: '["fr_FR", "de_DE", "es_ES", "mr", "nl_BE", "it_IT", "en_US", "pt_BR"]'
+      npm-script: screenshots:wporg
+      output-path: .wordpress-org
+      branch-prefix: wp-org-screenshots
+      pr-title-template: 'Update {0} screenshots for wordpress.org'
+      update-all: ${{ github.event.inputs.updateAllSnapshots == 'true' }}

@@ -1,59 +1,318 @@
 /**
- * External dependencies.
+ * External dependencies
  */
-import { render } from '@testing-library/react';
-import { expect, test } from '@jest/globals';
+import { render, act } from '@testing-library/react';
+import { expect, test, jest, beforeEach } from '@jest/globals';
 import '@testing-library/jest-dom';
 
 /**
- * Internal dependencies.
+ * WordPress dependencies
  */
-import MapEmbed from '../../../../../src/components/MapEmbed';
+jest.mock( '@wordpress/data', () => ( {
+	select: jest.fn(),
+} ) );
+
+/**
+ * Mock Google Maps API loader
+ */
+jest.mock( '@src/helpers/google-maps-api', () => ( {
+	loadGoogleMapsApi: jest.fn(),
+} ) );
+
+/**
+ * Internal dependencies
+ */
+import MapEmbed from '@src/components/MapEmbed';
+import { loadGoogleMapsApi } from '@src/helpers/google-maps-api';
+import { select } from '@wordpress/data';
+
+beforeEach( () => {
+	jest.clearAllMocks();
+
+	// Default mock for select().
+	select.mockImplementation( ( store ) => {
+		if ( 'core' === store ) {
+			return {
+				canUser: jest.fn( () => false ),
+			};
+		}
+		if ( 'core/edit-post' === store ) {
+			return null;
+		}
+		if ( 'core/editor' === store ) {
+			return {
+				getEditorSettings: () => ( {
+					gatherpress: { settings: {} },
+				} ),
+			};
+		}
+		return null;
+	} );
+} );
 
 /**
  * Coverage for MapEmbed.
  */
-test('MapEmbed returns empty when no location is provided', () => {
-	const { container } = render(<MapEmbed />);
+test( 'MapEmbed returns empty when no location is provided', () => {
+	const { container } = render( <MapEmbed /> );
 
-	expect(container).toHaveTextContent('');
-});
+	expect( container ).toHaveTextContent( '' );
+} );
 
-test('MapEmbed returns address in source when location is set', () => {
-	const { container } = render(
-		<MapEmbed location="50 South Fullerton Avenue, Montclair, NJ 07042" />
-	);
+test( 'OSM MapEmbed returns a placeholder div when location is set but no coordinates', async () => {
+	select.mockImplementation( ( store ) => {
+		if ( 'core' === store ) {
+			return { canUser: jest.fn( () => false ) };
+		}
+		if ( 'core/edit-post' === store ) {
+			return null;
+		}
+		if ( 'core/editor' === store ) {
+			return {
+				getEditorSettings: () => ( {
+					gatherpress: { settings: { mapPlatform: 'osm' } },
+				} ),
+			};
+		}
+		return null;
+	} );
 
-	expect(container.children[0].getAttribute('src')).toContain(
-		'?q=50+South+Fullerton+Avenue%2C+Montclair%2C+NJ+07042'
-	);
-	expect(container.children[0].getAttribute('src')).toContain('&z=10');
-	expect(container.children[0].getAttribute('src')).toContain('&t=m');
-	expect(container.children[0].getAttribute('src')).toContain(
-		'&output=embed'
-	);
-	expect(container.children[0]).toHaveStyle(
-		'border: 0px; height: 300px; width: 100%;'
-	);
-});
+	let container;
 
-test('MapEmbed returns address in source when location, zoom, map type, height, and class are set', () => {
+	await act( async () => {
+		const result = render(
+			<MapEmbed location="50 South Fullerton Avenue, Montclair, NJ 07042" />,
+		);
+		container = result.container;
+	} );
+
+	// Should render a placeholder div with grey background when no coordinates.
+	expect( container.children[ 0 ] ).toBeInTheDocument();
+	expect( container.children[ 0 ] ).toHaveStyle( {
+		backgroundColor: 'rgb(224, 224, 224)',
+	} );
+} );
+
+test( 'Google MapEmbed returns a placeholder div when location is set but no coordinates', () => {
+	select.mockImplementation( ( store ) => {
+		if ( 'core' === store ) {
+			return { canUser: jest.fn( () => false ) };
+		}
+		if ( 'core/edit-post' === store ) {
+			return null;
+		}
+		if ( 'core/editor' === store ) {
+			return {
+				getEditorSettings: () => ( {
+					gatherpress: { settings: { mapPlatform: 'google' } },
+				} ),
+			};
+		}
+		return null;
+	} );
+
 	const { container } = render(
 		<MapEmbed
 			location="50 South Fullerton Avenue, Montclair, NJ 07042"
-			zoom={20}
-			type="k"
+			googleMapsApiKey="unit-test-key"
+		/>,
+	);
+
+	expect( container.children[ 0 ] ).toBeInTheDocument();
+	expect( container.children[ 0 ].tagName ).toBe( 'DIV' );
+	expect( container.children[ 0 ] ).toHaveStyle( {
+		backgroundColor: 'rgb(224, 224, 224)',
+	} );
+} );
+
+test( 'Google MapEmbed returns address in source when location is set', () => {
+	select.mockImplementation( ( store ) => {
+		if ( 'core' === store ) {
+			return { canUser: jest.fn( () => false ) };
+		}
+		if ( 'core/edit-post' === store ) {
+			return null;
+		}
+		if ( 'core/editor' === store ) {
+			return {
+				getEditorSettings: () => ( {
+					gatherpress: { settings: { mapPlatform: 'google' } },
+				} ),
+			};
+		}
+		return null;
+	} );
+	const { container } = render(
+		<MapEmbed
+			location="50 South Fullerton Avenue, Montclair, NJ 07042"
+			latitude="40.8117036"
+			longitude="-74.2187738"
+		/>,
+	);
+
+	expect( container.children[ 0 ].getAttribute( 'src' ) ).toContain(
+		'?q=40.8117036%2C-74.2187738',
+	);
+	expect( container.children[ 0 ].getAttribute( 'src' ) ).toContain( '&z=10' );
+	expect( container.children[ 0 ].getAttribute( 'src' ) ).toContain( '&t=m' );
+	expect( container.children[ 0 ].getAttribute( 'src' ) ).toContain(
+		'&output=embed',
+	);
+	expect( container.children[ 0 ] ).toHaveStyle(
+		'border: 0px; height: 100%; width: 100%;',
+	);
+} );
+
+test( 'Google MapEmbed uses the Maps JavaScript API when googleMapsApiKey prop is set', async () => {
+	select.mockImplementation( ( store ) => {
+		if ( 'core' === store ) {
+			return { canUser: jest.fn( () => false ) };
+		}
+		if ( 'core/edit-post' === store ) {
+			return null;
+		}
+		if ( 'core/editor' === store ) {
+			return {
+				getEditorSettings: () => ( {
+					gatherpress: { settings: { mapPlatform: 'google' } },
+				} ),
+			};
+		}
+		return null;
+	} );
+
+	const mapInstance = {
+		setCenter: jest.fn(),
+		setZoom: jest.fn(),
+		setMapTypeId: jest.fn(),
+	};
+	const maps = {
+		Map: jest.fn( () => mapInstance ),
+		Marker: jest.fn( () => ( {} ) ),
+	};
+	loadGoogleMapsApi.mockResolvedValue( maps );
+
+	let container;
+	await act( async () => {
+		( { container } = render(
+			<MapEmbed
+				location="Test"
+				latitude="40.8117036"
+				longitude="-74.2187738"
+				zoom={ 15 }
+				type="terrain"
+				googleMapsApiKey="unit-test-key"
+			/>,
+		) );
+	} );
+
+	// The keyed path mounts a JS API map into a div — no iframe.
+	expect( container.children[ 0 ].tagName ).toBe( 'DIV' );
+	expect( loadGoogleMapsApi ).toHaveBeenCalledWith(
+		'unit-test-key',
+		document,
+	);
+	// The JS API honors the full map-type set — terrain stays terrain.
+	expect( maps.Map ).toHaveBeenCalledWith(
+		expect.anything(),
+		expect.objectContaining( { mapTypeId: 'terrain', zoom: 15 } ),
+	);
+} );
+
+test( 'MapEmbed returns address in source when location, zoom, map type, and class are set', () => {
+	select.mockImplementation( ( store ) => {
+		if ( 'core' === store ) {
+			return { canUser: jest.fn( () => false ) };
+		}
+		if ( 'core/edit-post' === store ) {
+			return null;
+		}
+		if ( 'core/editor' === store ) {
+			return {
+				getEditorSettings: () => ( {
+					gatherpress: { settings: { mapPlatform: 'google' } },
+				} ),
+			};
+		}
+		return null;
+	} );
+	const { container } = render(
+		<MapEmbed
+			location="50 South Fullerton Avenue, Montclair, NJ 07042"
+			latitude="40.8117036"
+			longitude="-74.2187738"
+			zoom={ 20 }
+			type="satellite"
 			className="unit-test"
-			height={100}
-		/>
+		/>,
 	);
-	expect(container.children[0].getAttribute('src')).toContain(
-		'q=50+South+Fullerton+Avenue%2C+Montclair%2C+NJ+07042'
+	expect( container.children[ 0 ].getAttribute( 'src' ) ).toContain(
+		'?q=40.8117036%2C-74.2187738',
 	);
-	expect(container.children[0].getAttribute('src')).toContain('&z=20');
-	expect(container.children[0].getAttribute('src')).toContain('&t=k');
-	expect(container.children[0]).toHaveStyle(
-		'border: 0px; height: 100px; width: 100%;'
+	expect( container.children[ 0 ].getAttribute( 'src' ) ).toContain( '&z=20' );
+	expect( container.children[ 0 ].getAttribute( 'src' ) ).toContain( '&t=k' );
+	expect( container.children[ 0 ] ).toHaveStyle(
+		'border: 0px; height: 100%; width: 100%;',
 	);
-	expect(container.children[0]).toHaveClass('unit-test');
-});
+	expect( container.children[ 0 ] ).toHaveClass( 'unit-test' );
+} );
+
+test( 'MapEmbed uses default location when admin user is not in post editor and no location provided', () => {
+	// Mock isAdmin = true, isPostEditor = false.
+	select.mockImplementation( ( store ) => {
+		if ( 'core' === store ) {
+			return {
+				canUser: jest.fn( () => true ),
+			};
+		}
+		if ( 'core/edit-post' === store ) {
+			return null; // Not in post editor.
+		}
+		if ( 'core/editor' === store ) {
+			return {
+				getEditorSettings: () => ( {
+					gatherpress: { settings: { mapPlatform: 'google' } },
+				} ),
+			};
+		}
+		return null;
+	} );
+
+	const { container } = render( <MapEmbed /> );
+
+	// Default location is set server-side but coords are still missing — show
+	// the same grey placeholder as the editor until geocode data exists.
+	expect( container.children[ 0 ] ).toBeInTheDocument();
+	expect( container.children[ 0 ].tagName ).toBe( 'DIV' );
+	expect( container.children[ 0 ] ).toHaveStyle( {
+		backgroundColor: 'rgb(224, 224, 224)',
+	} );
+} );
+
+test( 'MapEmbed returns empty fragment when mapPlatform is invalid', () => {
+	select.mockImplementation( ( store ) => {
+		if ( 'core' === store ) {
+			return { canUser: jest.fn( () => false ) };
+		}
+		if ( 'core/edit-post' === store ) {
+			return null;
+		}
+		if ( 'core/editor' === store ) {
+			return {
+				getEditorSettings: () => ( {
+					gatherpress: {
+						settings: { mapPlatform: 'invalid-platform' },
+					},
+				} ),
+			};
+		}
+		return null;
+	} );
+
+	const { container } = render(
+		<MapEmbed location="50 South Fullerton Avenue, Montclair, NJ 07042" />,
+	);
+
+	// Should return empty fragment.
+	expect( container ).toHaveTextContent( '' );
+} );

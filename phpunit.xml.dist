@@ -13,9 +13,13 @@
 			<directory prefix="class-test-" suffix=".php">./test/unit/php/</directory>
 		</testsuite>
 	</testsuites>
+	<groups>
+		<exclude>
+			<group>multisite</group>
+		</exclude>
+	</groups>
 	<coverage>
 		<include>
-			<directory suffix=".php">./includes/buddypress/classes</directory>
 			<directory suffix=".php">./includes/core/classes</directory>
 		</include>
 	</coverage>
