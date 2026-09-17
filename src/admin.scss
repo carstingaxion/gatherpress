@@ -1,12 +1,123 @@
-.gatherpress-admin {
-	&__site-check {
-		align-items: center;
-		display: flex;
-		gap: 1rem;
-		padding: 0.5rem;
+// Reusable component styles. The pattern-picker modal portals to
+// document.body — outside any block's iframe — so its styles need to live in
+// the admin-wide bundle, not in a block's editor stylesheet.
+@use "components/PatternPicker";
 
-		> div:last-child {
-			margin-left: auto;
-		}
+.gatherpress-attendee-info {
+	display: flex;
+	gap: 0.5rem;
+}
+
+[data-gatherpress-no-render="true"] {
+	opacity: 0.35;
+}
+
+/* RSVP column styling for admin events list */
+.gatherpress-rsvp-container {
+	position: relative;
+	display: inline-block;
+}
+
+.gatherpress-rsvp-approved {
+	font-size: 14px;
+	font-weight: bold;
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.gatherpress-rsvp-icon {
+	display: inline-block;
+	padding: 4px 8px;
+	background: #a7aaad;
+	border-radius: 3px;
+	color: #fff;
+	font-size: 11px;
+	font-weight: normal;
+	line-height: 1;
+}
+
+.gatherpress-rsvp-approved:hover .gatherpress-rsvp-icon {
+	background: var(--wp-admin-theme-color, #0073aa);
+}
+
+.gatherpress-rsvp-pending {
+	position: absolute;
+	top: -8px;
+	right: -12px;
+	background: var(--wp-admin-theme-color, #d63638);
+	color: #fff;
+	border-radius: 50%;
+	font-size: 10px;
+	font-weight: bold;
+	padding: 2px 4px;
+	line-height: 1;
+	width: 18px;
+	height: 18px;
+	min-width: 18px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	text-decoration: none;
+	box-sizing: border-box;
+	z-index: 1;
+}
+
+.gatherpress-rsvp-pending:hover {
+	background: var(--wp-admin-theme-color-darker-10, #b32d2e);
+	color: #fff;
+}
+
+/* Popular Venues Quick Select */
+.gatherpress-popular-venues {
+	margin: 12px 0;
+}
+
+.gatherpress-popular-venues__label {
+	margin: 0;
+	font-size: 12px;
+	color: #757575;
+}
+
+.gatherpress-popular-venue.components-button.is-link {
+	text-decoration: none;
+	padding: 0;
+	height: auto;
+	min-height: 0;
+	margin-right: 0.5rem;
+}
+
+.gatherpress-popular-venue.components-button.is-link:not(:disabled):hover {
+	text-decoration: underline;
+}
+
+.gatherpress-popular-venue--selected.components-button.is-link {
+	font-weight: 600;
+	color: #1e1e1e;
+	cursor: default;
+}
+
+.gatherpress-popular-venue--selected.components-button.is-link:disabled {
+	opacity: 1;
+}
+
+// Float the RSVP block's own settings panel to the top of the block
+// inspector's Settings tab, above core's Layout panel. Core renders its
+// support panels (Layout) and the block's own InspectorControls into the same
+// wrapper, in that order, and offers no API for ordering them. The wrapper's
+// own class is generated, so the panel is reached through `:has()` and
+// reordered with flexbox instead.
+.block-editor-block-inspector [role="tabpanel"] :has(> .gatherpress-rsvp-block-settings) {
+	display: flex;
+	flex-direction: column;
+
+	> * {
+		order: 1;
 	}
+}
+
+.block-editor-block-inspector [role="tabpanel"] .gatherpress-rsvp-block-settings {
+	order: 0;
 }

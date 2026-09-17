@@ -5,7 +5,7 @@
  * This template is used to generate email notifications for events in GatherPress.
  *
  * @package GatherPress\Core
- * @since 1.0.0
+ * @since 0.27.0
  *
  * @param int    $event_id The ID of the event for which the email is generated.
  * @param string $message  Optional message content for the email.
@@ -15,18 +15,21 @@
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
 
 use GatherPress\Core\Event;
+use GatherPress\Core\Utility;
+use GatherPress\Core\Venue;
 
 if ( ! isset( $event_id, $message ) ) {
 	return;
 }
 
-$gatherpress_event = new Event( $event_id );
-$gatherpress_venue = $gatherpress_event->get_venue_information()['name'];
+$gatherpress_event       = new Event( $event_id );
+$gatherpress_event_image = get_post_thumbnail_id( $event_id );
+$gatherpress_venue       = $gatherpress_event->get_venue_information()['name'];
 
 ?>
 
 <!DOCTYPE html>
-<html lang="en-US">
+<html <?php language_attributes(); ?>>
 	<head>
 		<title><?php echo wp_kses_post( get_the_title( $event_id ) ); ?></title>
 	</head>
@@ -36,8 +39,26 @@ $gatherpress_venue = $gatherpress_event->get_venue_information()['name'];
 				<?php echo wp_kses( nl2br( $message ), array( 'br' => array() ) ); ?>
 			</p>
 		<?php endif; ?>
-		<!-- Feature Image -->
-		<img src="<?php echo esc_url( get_the_post_thumbnail_url( $event_id, 'full' ) ); ?>" alt="<?php esc_attr_e( 'Event Image', 'gatherpress' ); ?>" style="max-width: 100%;">
+		<?php if ( $gatherpress_event_image ) : ?>
+			<!-- Featured Image -->
+			<?php
+			echo wp_get_attachment_image(
+				$gatherpress_event_image,
+				'full',
+				false,
+				array(
+					'alt'   => esc_attr(
+						sprintf(
+							/* translators: %s: Singular post type label, e.g. "Event". */
+							__( '%s Image', 'gatherpress' ),
+							Utility::post_type_label( 'singular_name', (string) get_post_type( $event_id ) )
+						)
+					),
+					'style' => 'max-width: 100%;',
+				)
+			);
+			?>
+		<?php endif; ?>
 
 		<!-- Event Title -->
 		<h1 style="text-align: center;"><?php echo wp_kses_post( get_the_title( $event_id ) ); ?></h1>
@@ -54,8 +75,12 @@ $gatherpress_venue = $gatherpress_event->get_venue_information()['name'];
 		<?php if ( ! empty( $gatherpress_venue ) ) : ?>
 			<p style="text-align: center;">
 				<?php
-				/* translators: %s: gatherpress_event gatherpress_venue name. */
-				printf( esc_html__( 'Venue: %s', 'gatherpress' ), wp_kses_post( $gatherpress_venue ) );
+				printf(
+					/* translators: 1: Singular post type label (e.g. "Venue"), 2: Venue name. */
+					esc_html__( '%1$s: %2$s', 'gatherpress' ),
+					esc_html( Utility::post_type_label( 'singular_name', Venue::POST_TYPE ) ),
+					wp_kses_post( $gatherpress_venue )
+				);
 				?>
 			</p>
 		<?php endif; ?>

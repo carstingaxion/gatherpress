@@ -1,50 +1,113 @@
 /**
- * WordPress dependencies.
+ * WordPress dependencies
  */
-import { subscribe } from '@wordpress/data';
-import { useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { useDispatch, useSelect } from '@wordpress/data';
+import { useEffect } from '@wordpress/element';
 
 /**
- * Internal dependencies.
+ * Internal dependencies
  */
-import { saveDateTime } from '../helpers/datetime';
+import {
+	dateTimeDatabaseFormat,
+	createMomentWithTimezone,
+	useMatchedDuration,
+} from '../helpers/datetime';
 import DateTimeStart from '../components/DateTimeStart';
 import DateTimeEnd from '../components/DateTimeEnd';
-import TimeZone from '../components/TimeZone';
+import Timezone from './Timezone';
+import Duration from '../components/Duration';
 
 /**
  * DateTimeRange component for GatherPress.
  *
- * This component manages the date and time range selection. It includes
- * DateTimeStart, DateTimeEnd, and TimeZone components. The selected values
- * for start date and time, end date and time, and timezone are managed in the
- * component's state. The component subscribes to the saveDateTime function,
- * which is triggered to save the selected date and time values.
+ * This component manages the selection of a date and time range for events.
+ * It includes DateTimeStart, DateTimeEnd, and Timezone components to allow users
+ * to set the event's start date, end date, and timezone. The component pulls
+ * these values from the state using WordPress data stores and subscribes to changes
+ * via the `saveDateTime` function. On changes, the component updates the post meta
+ * with the selected date and time values, formatted for the database.
  *
- * @since 1.0.0
+ * The component also handles the duration of the event, checking if the end time
+ * matches a predefined duration option and updating the duration accordingly.
  *
- * @return {JSX.Element} The rendered React component.
+ * @since 0.27.0
+ *
+ * @return {JSX.Element} The rendered DateTimeRange React component.
  */
 const DateTimeRange = () => {
-	const [dateTimeStart, setDateTimeStart] = useState();
-	const [dateTimeEnd, setDateTimeEnd] = useState();
-	const [timezone, setTimezone] = useState();
+	const editPost = useDispatch( 'core/editor' ).editPost;
+	let dateTimeMetaData = useSelect(
+		( select ) =>
+			select( 'core/editor' ).getEditedPostAttribute( 'meta' )
+				?.gatherpress_datetime,
+	);
 
-	subscribe(saveDateTime);
+	try {
+		dateTimeMetaData = dateTimeMetaData ? JSON.parse( dateTimeMetaData ) : {};
+	} catch ( e ) {
+		// eslint-disable-next-line no-console
+		console.error( 'Failed to parse gatherpress_datetime meta:', e );
+		dateTimeMetaData = {};
+	}
+
+	const { dateTimeStart, dateTimeEnd, timezone, isCleanNewPost } = useSelect(
+		( select ) => ( {
+			dateTimeStart: select( 'gatherpress/datetime' ).getDateTimeStart(),
+			dateTimeEnd: select( 'gatherpress/datetime' ).getDateTimeEnd(),
+			timezone: select( 'gatherpress/datetime' ).getTimezone(),
+			isCleanNewPost: select( 'core/editor' ).isCleanNewPost(),
+		} ),
+		[],
+	);
+	// Matched preset (or `false`) for the start/end pair. Memoized on the
+	// inputs so the moment.tz comparisons run once per real change rather
+	// than once per render — see `useMatchedDuration` for the #1607 context.
+	const matchedDuration = useMatchedDuration();
+
+	useEffect( () => {
+		// Don't write meta into an untouched new post. The store already holds
+		// the defaults while the stored meta is empty, so this effect's first
+		// run would be a real edit and the editor would report unsaved changes
+		// before the author typed anything (#2054).
+		//
+		// Nothing is lost by waiting: `Event\Setup::set_datetimes()` fills the
+		// same defaults server side when the meta is absent at save time. Any
+		// real edit clears `isCleanNewPost`, and this effect runs from then on.
+		if ( isCleanNewPost ) {
+			return;
+		}
+
+		const payload = JSON.stringify( {
+			...dateTimeMetaData,
+			dateTimeStart: createMomentWithTimezone( dateTimeStart, timezone )
+				.format( dateTimeDatabaseFormat ),
+			dateTimeEnd: createMomentWithTimezone( dateTimeEnd, timezone )
+				.format( dateTimeDatabaseFormat ),
+			timezone,
+		} );
+		const meta = { gatherpress_datetime: payload };
+
+		editPost( { meta } );
+	}, [
+		dateTimeStart,
+		dateTimeEnd,
+		timezone,
+		dateTimeMetaData,
+		editPost,
+		isCleanNewPost,
+	] );
 
 	return (
 		<>
-			<h3>{__('Date & time', 'gatherpress')}</h3>
-			<DateTimeStart
-				dateTimeStart={dateTimeStart}
-				setDateTimeStart={setDateTimeStart}
-			/>
-			<DateTimeEnd
-				dateTimeEnd={dateTimeEnd}
-				setDateTimeEnd={setDateTimeEnd}
-			/>
-			<TimeZone timezone={timezone} setTimezone={setTimezone} />
+			<section>
+				<DateTimeStart />
+			</section>
+			<section>
+				{ matchedDuration ? <Duration /> : <DateTimeEnd /> }
+			</section>
+			<section>
+				<Timezone />
+			</section>
 		</>
 	);
 };

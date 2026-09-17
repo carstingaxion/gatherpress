@@ -4,17 +4,18 @@
  *
  * @package GatherPress
  * @subpackage Core
- * @since 1.0.0
+ * @since 0.27.0
  */
 
 namespace GatherPress\Tests\Core;
 
-use PMC\Unit_Test\Base;
+use GatherPress\Tests\Base;
 
 /**
  * Class Test_GatherPress.
  */
 class Test_GatherPress extends Base {
+
 	/**
 	 * Check plugin version.
 	 *

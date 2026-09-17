@@ -1,0 +1,124 @@
+name: Playground Preview Comment
+
+# Privileged companion to the `Playground Preview` workflow.
+#
+# Triggered when the build workflow finishes, downloads its artifact, and posts
+# the PR comment with playground links. Because this runs via workflow_run, it
+# executes from the base repo's default branch — never from PR-controlled code
+# — even though it has `pull-requests: write` to post the comment.
+
+on:
+  workflow_run:
+    workflows: ['Playground Preview']
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+
+  comment:
+    name: Comment with playground link
+    # Only post for successful PR runs. Skips push/scheduled invocations of
+    # the upstream workflow (none today, but defensive) and failed builds.
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+
+      # The upstream workflow encodes the PR number in the artifact name
+      # (`gatherpress-pr-<number>`), so listing the run's artifacts is
+      # enough — no artifact download or pr-number.txt payload file needed.
+      - name: Read PR number from artifact name
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.payload.workflow_run.id,
+            });
+            const prefix = `${context.repo.repo}-pr-`;
+            const artifact = data.artifacts.find(
+                (a) => a.name.startsWith(prefix) && /^\d+$/.test(a.name.slice(prefix.length))
+            );
+            if (!artifact) {
+                core.setFailed(`No ${prefix}<number> artifact found on run ${context.payload.workflow_run.id}`);
+                return;
+            }
+            core.setOutput('number', artifact.name.slice(prefix.length));
+
+      # Check out the base repo at the default branch (trusted code) so the
+      # github-script step below can require .github/scripts/playground-preview
+      # from the merged base, never from the PR.
+      - name: Checkout base repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: base
+
+      # PR head override file — fetched over the API rather than checked out.
+      #
+      # actions/checkout refuses to check out fork PR code from a workflow_run
+      # context, because this job holds the base repo's GITHUB_TOKEN and secrets
+      # ("pwn request"). That refusal is correct, and opting out with
+      # allow-unsafe-pr-checkout would undo the reason this workflow is split
+      # from the build in the first place.
+      #
+      # The override is data, not code: one JSON file the script below reads and
+      # sanitizes. Reading it through the contents API gets that data without a
+      # working copy of fork code, so the guard never applies. Written to the
+      # path the script already expects, so its interface is unchanged.
+      - name: Fetch PR blueprint override
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const dir = 'pr-head/.github/playground';
+            const file = `PR-${ process.env.PR_NUMBER }-blueprint-override.json`;
+
+            fs.mkdirSync(dir, { recursive: true });
+
+            try {
+                const { data } = await github.rest.repos.getContent({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    path: `.github/playground/${ file }`,
+                    ref: context.payload.workflow_run.head_sha,
+                });
+
+                fs.writeFileSync(
+                    `${ dir }/${ file }`,
+                    Buffer.from(data.content, data.encoding)
+                );
+                console.log(`Fetched blueprint override ${ file }`);
+            } catch (error) {
+                if (404 !== error.status) {
+                    throw error;
+                }
+                console.log(`No blueprint override at ${ file }`);
+            }
+
+      - name: Add Preview Links comment
+        uses: actions/github-script@v7
+        env:
+          PHP_VERSIONS: '["8.4","8.2","8.1"]'
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const overrideFilePath = 'pr-head/.github/playground/';
+            const createPreviewLinks = require('./base/.github/scripts/playground-preview');
+            await createPreviewLinks(
+                github,
+                context,
+                Number(process.env.PR_NUMBER),
+                overrideFilePath
+            );
